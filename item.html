@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Gold jewelry item detail page.">
+  <title>Item Detail — Gold Shop</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo" aria-label="Gold Shop Home">
+        <div class="logo-icon" aria-hidden="true">✦</div>
+        <div class="logo-text">
+          <span class="logo-name">Gold Shop</span>
+          <span class="logo-tagline" data-i18n="logo.tagline">Fine Jewelry</span>
+        </div>
+      </a>
+
+      <nav class="header-nav" aria-label="Main navigation">
+        <a href="index.html" class="nav-link" data-i18n="nav.catalog">Catalog</a>
+        <a href="admin.html" class="btn-admin" data-i18n="nav.admin">Admin</a>
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.label" aria-label="Language">
+          <button class="lang-btn" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="es">ES</button>
+        </div>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ── Main ─────────────────────────────────────────────── -->
+  <main>
+    <div class="container">
+
+      <!-- Back link -->
+      <a href="index.html" class="detail-back">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+          stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+          aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"/>
+        </svg>
+        <span data-i18n="detail.back">Back to Catalog</span>
+      </a>
+
+      <!-- Detail layout -->
+      <div class="detail-layout">
+
+        <!-- Left: Image -->
+        <div>
+          <div class="detail-image-wrap" id="detailImageWrap" aria-label="Product image">
+            <!-- Injected by app.js -->
+          </div>
+        </div>
+
+        <!-- Right: Info -->
+        <div class="detail-info">
+
+          <div>
+            <p class="detail-category" id="detailCategory"></p>
+            <h1 class="detail-name" id="detailName"></h1>
+          </div>
+
+          <div class="detail-status">
+            <span class="status-badge" id="detailBadge"></span>
+          </div>
+
+          <hr class="detail-divider">
+
+          <p class="detail-description" id="detailDesc"></p>
+
+          <hr class="detail-divider">
+
+          <!-- Weight + Price specs -->
+          <div class="detail-specs">
+            <div class="spec-item">
+              <div class="spec-label" data-i18n="spec.weight">Weight</div>
+              <div class="spec-value">
+                <span id="detailWeight"></span><span class="spec-unit">g</span>
+              </div>
+            </div>
+            <div class="spec-item">
+              <div class="spec-label" data-i18n="spec.price">Price</div>
+              <div class="spec-value" id="detailPrice"></div>
+            </div>
+          </div>
+
+          <!-- Contact CTA -->
+          <button class="btn-contact" id="contactBtn" type="button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+              aria-hidden="true">
+              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.44 2 2 0 0 1 3.6 1.27h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.96a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 16.92z"/>
+            </svg>
+            <span data-i18n="detail.contact">Contact Store to Purchase</span>
+          </button>
+
+          <p class="store-note">
+            <strong data-i18n="detail.note.title">In-store purchase only.</strong><br>
+            <span data-i18n="detail.note.body">Visit us or send a message — we'll hold the item for you.</span>
+          </p>
+
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Footer ───────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <div class="footer-brand">Gold Shop</div>
+    <p data-i18n="footer.tagline">Browse online &mdash; purchase in person at our store.</p>
+    <p style="margin-top:8px;">&copy; <span id="footerYear"></span> Gold Shop. <span data-i18n="footer.rights">All rights reserved.</span></p>
+  </footer>
+
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('footerYear').textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

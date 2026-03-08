@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Gold Shop admin dashboard — manage your jewelry inventory.">
+  <title>Admin Dashboard — Gold Shop</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+  <style>
+    .admin-header-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .6px;
+      text-transform: uppercase;
+      color: var(--gold-dark);
+      background: var(--gold-pale);
+      border: 1px solid var(--gold-border);
+      padding: 4px 12px;
+      border-radius: 999px;
+    }
+
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 16px;
+      margin-bottom: 32px;
+    }
+
+    .stat-card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .stat-value {
+      font-family: var(--font-serif);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--text-primary);
+      line-height: 1;
+    }
+
+    .stat-card.available .stat-value { color: var(--status-available); }
+    .stat-card.pending   .stat-value { color: var(--status-pending); }
+    .stat-card.sold      .stat-value { color: var(--status-sold); }
+
+    .form-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .lang-section {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0 2px;
+    }
+
+    .lang-section-tag {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      padding: 2px 8px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .lang-section-tag.en {
+      background: #EEF2FF;
+      color: #3949AB;
+      border: 1px solid #C5CAE9;
+    }
+
+    .lang-section-tag.es {
+      background: #FFF3E0;
+      color: #E65100;
+      border: 1px solid #FFCC80;
+    }
+
+    .lang-section-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .translate-indicator {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.4px;
+      color: var(--text-muted);
+      white-space: nowrap;
+      opacity: 0;
+      transition: opacity 0.25s;
+    }
+    .translate-indicator:not(:empty) { opacity: 1; }
+    .translate-indicator.loading { color: var(--gold-dark); }
+    .translate-indicator.done    { color: #2E7D32; }
+    .translate-indicator.error   { color: #C62828; }
+
+    @media (max-width: 640px) {
+      .form-row { grid-template-columns: 1fr; }
+      .inventory-table thead .hide-mobile { display: none; }
+      .inventory-table tbody .hide-mobile { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Header ──────────────────────────────────────────── -->
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo" aria-label="Gold Shop Home">
+        <div class="logo-icon" aria-hidden="true">✦</div>
+        <div class="logo-text">
+          <span class="logo-name">Gold Shop</span>
+          <span class="logo-tagline" data-i18n="logo.tagline">Fine Jewelry</span>
+        </div>
+      </a>
+
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <span class="admin-header-badge" aria-label="Admin mode">
+          <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24"
+            fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+            stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+          </svg>
+          <span data-i18n="admin.badge">Admin</span>
+        </span>
+        <a href="index.html" class="btn-admin" data-i18n="nav.viewStore">View Store</a>
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.label" aria-label="Language">
+          <button class="lang-btn" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="es">ES</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Page hero ────────────────────────────────────────── -->
+  <section class="page-hero" aria-label="Admin dashboard header">
+    <div class="container">
+      <h1 data-i18n="hero.admin.title">Inventory Dashboard</h1>
+      <p data-i18n="hero.admin.subtitle">Add, edit, and manage your gold shop listings.</p>
+      <div class="hero-divider" aria-hidden="true">
+        <span></span>
+        <i>✦</i>
+        <span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Main ─────────────────────────────────────────────── -->
+  <main>
+    <div class="container">
+      <div class="admin-layout" style="padding-top:32px;">
+
+        <!-- ── Left: Add/Edit form ───────────────────────── -->
+        <aside>
+          <div class="admin-panel">
+            <div class="admin-panel-header">
+              <div>
+                <h2 id="formTitle" data-i18n="form.add.title">Add New Item</h2>
+                <p id="formSubtitle" data-i18n="form.subtitle">Fill in the details below</p>
+              </div>
+            </div>
+
+            <form class="admin-form" id="productForm" novalidate>
+
+              <!-- EN section header -->
+              <div class="lang-section">
+                <span class="lang-section-tag en">EN</span>
+                <span class="lang-section-line"></span>
+              </div>
+
+              <!-- Name (EN) -->
+              <div class="form-group">
+                <label class="form-label" for="productName">
+                  <span data-i18n="form.label.name">Product Name (English)</span>
+                  <span class="required" aria-hidden="true">*</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="text"
+                  id="productName"
+                  name="productName"
+                  data-i18n-placeholder="form.placeholder.name"
+                  placeholder="e.g. 22k Gold Necklace"
+                  required
+                  autocomplete="off"
+                >
+              </div>
+
+              <!-- Description (EN) -->
+              <div class="form-group">
+                <label class="form-label" for="description">
+                  <span data-i18n="form.label.desc">Description (English)</span>
+                </label>
+                <textarea
+                  class="form-textarea"
+                  id="description"
+                  name="description"
+                  data-i18n-placeholder="form.placeholder.desc"
+                  placeholder="Brief description of the item…"
+                  rows="3"
+                ></textarea>
+              </div>
+
+              <!-- ES section header -->
+              <div class="lang-section">
+                <span class="lang-section-tag es">ES</span>
+                <span class="lang-section-line"></span>
+                <span id="translateIndicator" class="translate-indicator" aria-live="polite"></span>
+              </div>
+
+              <!-- Name (ES) -->
+              <div class="form-group">
+                <label class="form-label" for="productNameEs">
+                  <span data-i18n="form.label.name_es">Product Name (Spanish)</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="text"
+                  id="productNameEs"
+                  name="productNameEs"
+                  data-i18n-placeholder="form.placeholder.name_es"
+                  placeholder="e.g. Collar de Oro 22k"
+                  autocomplete="off"
+                >
+              </div>
+
+              <!-- Description (ES) -->
+              <div class="form-group">
+                <label class="form-label" for="descriptionEs">
+                  <span data-i18n="form.label.desc_es">Description (Spanish)</span>
+                </label>
+                <textarea
+                  class="form-textarea"
+                  id="descriptionEs"
+                  name="descriptionEs"
+                  data-i18n-placeholder="form.placeholder.desc_es"
+                  placeholder="e.g. Collar artesanal tradicional…"
+                  rows="3"
+                ></textarea>
+              </div>
+
+              <!-- Category -->
+              <div class="form-group">
+                <label class="form-label" for="category">
+                  <span data-i18n="form.label.category">Category</span>
+                </label>
+                <select class="form-select" id="category" name="category">
+                  <option value="necklace" data-i18n="cat.necklace">Necklace</option>
+                  <option value="bangle"   data-i18n="cat.bangle">Bangle</option>
+                  <option value="earring"  data-i18n="cat.earring">Earring</option>
+                  <option value="ring"     data-i18n="cat.ring">Ring</option>
+                  <option value="bracelet" data-i18n="cat.bracelet">Bracelet</option>
+                  <option value="coin"     data-i18n="cat.coin">Coin / Bar</option>
+                  <option value="other"    data-i18n="cat.other">Other</option>
+                </select>
+              </div>
+
+              <!-- Weight + Price -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="weight">
+                    <span data-i18n="form.label.weight">Weight (g)</span>
+                    <span class="required" aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    class="form-input"
+                    type="number"
+                    id="weight"
+                    name="weight"
+                    data-i18n-placeholder="form.placeholder.weight"
+                    placeholder="e.g. 25"
+                    min="0.1"
+                    step="0.1"
+                    required
+                  >
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="price">
+                    <span data-i18n="form.label.price">Price (USD)</span>
+                    <span class="required" aria-hidden="true">*</span>
+                  </label>
+                  <input
+                    class="form-input"
+                    type="number"
+                    id="price"
+                    name="price"
+                    data-i18n-placeholder="form.placeholder.price"
+                    placeholder="e.g. 2150"
+                    min="1"
+                    step="1"
+                    required
+                  >
+                </div>
+              </div>
+
+              <!-- Status -->
+              <div class="form-group">
+                <label class="form-label" for="status">
+                  <span data-i18n="form.label.status">Status</span>
+                </label>
+                <select class="form-select" id="status" name="status">
+                  <option value="AVAILABLE"    data-i18n="status.available">Available</option>
+                  <option value="SALE_PENDING" data-i18n="status.pending">Sale Pending</option>
+                  <option value="SOLD"         data-i18n="status.sold">Sold</option>
+                </select>
+              </div>
+
+              <!-- Image upload -->
+              <div class="form-group">
+                <label class="form-label" for="imageInput">
+                  <span data-i18n="form.label.image">Product Image</span>
+                </label>
+                <div class="image-upload-area" id="uploadArea">
+                  <input
+                    type="file"
+                    id="imageInput"
+                    name="imageInput"
+                    accept="image/*"
+                    aria-label="Upload product image"
+                  >
+                  <div class="upload-icon" aria-hidden="true">📷</div>
+                  <p class="upload-text" data-i18n="upload.text">Click or drag &amp; drop to upload</p>
+                  <p class="upload-hint" data-i18n="upload.hint">JPG, PNG, WEBP — max 5 MB</p>
+                </div>
+                <img class="image-preview" id="imagePreview" alt="Preview of selected product image">
+                <p class="form-hint" data-i18n="upload.note">Image will be stored locally. For production, use a server upload.</p>
+              </div>
+
+              <!-- Actions -->
+              <div class="form-actions">
+                <button class="btn-primary" type="submit" id="submitBtn" data-i18n="form.btn.add">Add Item</button>
+                <button
+                  class="btn-secondary"
+                  type="button"
+                  id="cancelEdit"
+                  style="display:none;"
+                  data-i18n="form.btn.cancel"
+                  aria-label="Cancel editing and reset form"
+                >Cancel</button>
+              </div>
+
+            </form>
+          </div>
+        </aside>
+
+        <!-- ── Right: Stats + Inventory table ─────────────── -->
+        <section aria-label="Inventory overview">
+
+          <!-- Stats row -->
+          <div class="stats-row" id="statsRow" aria-label="Inventory statistics">
+            <div class="stat-card">
+              <span class="stat-label" data-i18n="stats.total">Total Items</span>
+              <span class="stat-value" id="statTotal">—</span>
+            </div>
+            <div class="stat-card available">
+              <span class="stat-label" data-i18n="stats.available">Available</span>
+              <span class="stat-value" id="statAvailable">—</span>
+            </div>
+            <div class="stat-card pending">
+              <span class="stat-label" data-i18n="stats.pending">Sale Pending</span>
+              <span class="stat-value" id="statPending">—</span>
+            </div>
+            <div class="stat-card sold">
+              <span class="stat-label" data-i18n="stats.sold">Sold</span>
+              <span class="stat-value" id="statSold">—</span>
+            </div>
+          </div>
+
+          <!-- Table -->
+          <div class="admin-panel">
+            <div class="admin-panel-header">
+              <div>
+                <h2 data-i18n="table.title">Current Inventory</h2>
+                <p data-i18n="table.subtitle">All items in your catalog</p>
+              </div>
+            </div>
+
+            <div class="table-wrap">
+              <table class="inventory-table" aria-label="Inventory table">
+                <thead>
+                  <tr>
+                    <th aria-label="Image"></th>
+                    <th data-i18n="table.col.item">Item</th>
+                    <th class="hide-mobile" data-i18n="table.col.weight">Weight</th>
+                    <th data-i18n="table.col.price">Price</th>
+                    <th data-i18n="table.col.status">Status</th>
+                    <th aria-label="Actions"></th>
+                  </tr>
+                </thead>
+                <tbody id="tableBody">
+                  <!-- Injected by app.js -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Footer ───────────────────────────────────────────── -->
+  <footer class="site-footer">
+    <div class="footer-brand">Gold Shop</div>
+    <p data-i18n="footer.admin">Admin Dashboard — authorized personnel only.</p>
+    <p style="margin-top:8px;">&copy; <span id="footerYear"></span> Gold Shop. <span data-i18n="footer.rights">All rights reserved.</span></p>
+  </footer>
+
+  <script src="i18n.js"></script>
+  <script src="app.js"></script>
+  <script>
+    document.getElementById('footerYear').textContent = new Date().getFullYear();
+
+    function updateStats() {
+      const products = getAllProducts();
+      document.getElementById('statTotal').textContent     = products.length;
+      document.getElementById('statAvailable').textContent = products.filter(p => p.status === 'AVAILABLE').length;
+      document.getElementById('statPending').textContent   = products.filter(p => p.status === 'SALE_PENDING').length;
+      document.getElementById('statSold').textContent      = products.filter(p => p.status === 'SOLD').length;
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      updateStats();
+
+      const form  = document.getElementById('productForm');
+      const tbody = document.getElementById('tableBody');
+
+      if (form)  form.addEventListener('submit', () => setTimeout(updateStats, 50));
+      if (tbody) new MutationObserver(updateStats).observe(tbody, { childList: true });
+    });
+
+    /* Drag-over styling for upload area */
+    const area = document.getElementById('uploadArea');
+    if (area) {
+      area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag-over'); });
+      area.addEventListener('dragleave', ()  => area.classList.remove('drag-over'));
+      area.addEventListener('drop',      e  => { e.preventDefault(); area.classList.remove('drag-over'); });
+    }
+  </script>
+</body>
+</html>
