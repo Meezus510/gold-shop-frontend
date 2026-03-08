@@ -37,8 +37,9 @@
   --shadow-gold: 0 4px 20px rgba(201,168,76,.25);
 
   --transition: .25s ease;
-  --font-serif: 'Playfair Display', Georgia, serif;
-  --font-sans:  'Inter', 'Segoe UI', sans-serif;
+  --font-serif:    'Playfair Display', Georgia, serif;
+  --font-sans:     'Inter', 'Segoe UI', sans-serif;
+  --font-cursive:  'Dancing Script', cursive;
 }
 
 /* ── Reset & Base ─────────────────────────────────────────── */
@@ -126,8 +127,8 @@ button, input, select, textarea {
 }
 
 .logo-name {
-  font-family: var(--font-serif);
-  font-size: 18px;
+  font-family: var(--font-cursive);
+  font-size: 22px;
   font-weight: 700;
   color: var(--text-primary);
   letter-spacing: .5px;

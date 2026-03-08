@@ -483,13 +483,35 @@ function initAdmin() {
     cancelBtn.addEventListener('click', resetForm);
   }
 
-  /* -- Auto-translate -- */
-  const translateIndicator = document.getElementById('translateIndicator');
+  /* -- Auto-translate (one direction based on active language) -- */
+  const activeLang         = getLang();
+  const isEn               = activeLang === 'en';
+  const fromLang           = isEn ? 'en' : 'es';
+  const toLang             = isEn ? 'es' : 'en';
+
+  const nameEnField        = document.getElementById('productName');
+  const nameEsField        = document.getElementById('productNameEs');
+  const descEnField        = document.getElementById('description');
+  const descEsField        = document.getElementById('descriptionEs');
+
+  const primaryNameField   = isEn ? nameEnField   : nameEsField;
+  const primaryDescField   = isEn ? descEnField   : descEsField;
+  const secondaryNameField = isEn ? nameEsField   : nameEnField;
+  const secondaryDescField = isEn ? descEsField   : descEnField;
+
+  /* Mark secondary fields as read-only — they are filled by auto-translation */
+  [secondaryNameField, secondaryDescField].forEach(f => {
+    if (f) { f.readOnly = true; f.classList.add('field-readonly'); }
+  });
+
+  const translateIndicator = document.getElementById(
+    isEn ? 'translateIndicator' : 'translateIndicatorEn'
+  );
 
   function setIndicator(state) {
     if (!translateIndicator) return;
-    translateIndicator.textContent  = state ? t(`translate.${state}`) : '';
-    translateIndicator.className    = `translate-indicator${state ? ' ' + state : ''}`;
+    translateIndicator.textContent = state ? t(`translate.${state}`) : '';
+    translateIndicator.className   = `translate-indicator${state ? ' ' + state : ''}`;
   }
 
   function debounce(fn, delay) {
@@ -519,25 +541,18 @@ function initAdmin() {
     setTimeout(() => setIndicator(null), 3000);
   }
 
-  const debouncedEnToEs = debounce((text, target) => doTranslate(text, 'en', 'es', target), 800);
-  const debouncedEsToEn = debounce((text, target) => doTranslate(text, 'es', 'en', target), 800);
+  const debouncedTranslateName = debounce(
+    text => doTranslate(text, fromLang, toLang, secondaryNameField), 800
+  );
+  const debouncedTranslateDesc = debounce(
+    text => doTranslate(text, fromLang, toLang, secondaryDescField), 800
+  );
 
-  const nameEnField = document.getElementById('productName');
-  const nameEsField = document.getElementById('productNameEs');
-  const descEnField = document.getElementById('description');
-  const descEsField = document.getElementById('descriptionEs');
-
-  if (nameEnField) nameEnField.addEventListener('input', () => {
-    if (document.activeElement === nameEnField) debouncedEnToEs(nameEnField.value, nameEsField);
+  if (primaryNameField) primaryNameField.addEventListener('input', () => {
+    if (document.activeElement === primaryNameField) debouncedTranslateName(primaryNameField.value);
   });
-  if (nameEsField) nameEsField.addEventListener('input', () => {
-    if (document.activeElement === nameEsField) debouncedEsToEn(nameEsField.value, nameEnField);
-  });
-  if (descEnField) descEnField.addEventListener('input', () => {
-    if (document.activeElement === descEnField) debouncedEnToEs(descEnField.value, descEsField);
-  });
-  if (descEsField) descEsField.addEventListener('input', () => {
-    if (document.activeElement === descEsField) debouncedEsToEn(descEsField.value, descEnField);
+  if (primaryDescField) primaryDescField.addEventListener('input', () => {
+    if (document.activeElement === primaryDescField) debouncedTranslateDesc(primaryDescField.value);
   });
 
   /* -- Render table -- */
