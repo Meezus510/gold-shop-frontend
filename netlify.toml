@@ -1,5 +1,5 @@
 [build]
-  publish = "ui"
+  publish = "."
 
 # Security headers for all pages
 [[headers]]
@@ -16,11 +16,11 @@
     Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
-  for = "/*.js"
+  for = "/js/*.js"
   [headers.values]
     Cache-Control = "public, max-age=31536000, immutable"
 
 [[headers]]
-  for = "/*.html"
+  for = "/pages/*.html"
   [headers.values]
     Cache-Control = "no-cache"
