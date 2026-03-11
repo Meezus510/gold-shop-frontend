@@ -9,6 +9,80 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Volstead&display=swap" rel="stylesheet">
+  <style>
+    /* ── Enhanced filter bar ── */
+    .filter-bar { height: auto; padding: 10px 0 6px; }
+
+    .catalog-search-row { margin-bottom: 8px; }
+    .catalog-search-wrap {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      width: 100%;
+      max-width: 420px;
+    }
+    .catalog-search-icon {
+      position: absolute;
+      left: 12px;
+      color: var(--text-muted);
+      pointer-events: none;
+      flex-shrink: 0;
+    }
+    .catalog-search-input {
+      width: 100%;
+      padding: 8px 14px 8px 34px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 13px;
+      font-family: inherit;
+      background: var(--white);
+      color: var(--text-primary);
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .catalog-search-input:focus {
+      outline: none;
+      border-color: var(--gold-dark);
+      box-shadow: 0 0 0 3px rgba(201,168,76,.15);
+    }
+
+    .filter-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding: 3px 0;
+    }
+    .filter-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .filter-bottom-row {
+      justify-content: space-between;
+      margin-top: 4px;
+      padding-top: 6px;
+      border-top: 1px solid var(--border);
+    }
+    .sort-wrap { display: flex; align-items: center; gap: 8px; }
+    .sort-select {
+      padding: 5px 10px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: inherit;
+      background: var(--white);
+      color: var(--text-primary);
+      cursor: pointer;
+    }
+    .sort-select:focus { outline: none; border-color: var(--gold-dark); }
+
+    /* Active filter-btn styling for multi-select (same as original .active) */
+    .filter-btn.active {
+      background: var(--gold-dark);
+      color: var(--white);
+      border-color: var(--gold-dark);
+    }
+  </style>
 </head>
 <body>
 
@@ -48,17 +122,64 @@
   </section>
 
   <!-- ── Filter bar ───────────────────────────────────────── -->
-  <div class="filter-bar" role="navigation" aria-label="Filter by category">
-    <div class="container filter-inner">
-      <span class="filter-label" aria-hidden="true" data-i18n="filter.label">Filter:</span>
-      <button class="filter-btn active" data-filter="all"      data-i18n="filter.all">All</button>
-      <button class="filter-btn" data-filter="necklace"        data-i18n="filter.necklaces">Necklaces</button>
-      <button class="filter-btn" data-filter="bangle"          data-i18n="filter.bangles">Bangles</button>
-      <button class="filter-btn" data-filter="earring"         data-i18n="filter.earrings">Earrings</button>
-      <button class="filter-btn" data-filter="ring"            data-i18n="filter.rings">Rings</button>
-      <button class="filter-btn" data-filter="bracelet"        data-i18n="filter.bracelets">Bracelets</button>
-      <button class="filter-btn" data-filter="coin"            data-i18n="filter.coins">Coins &amp; Bars</button>
-      <span class="filter-count" id="productCount" aria-live="polite"></span>
+  <div class="filter-bar" role="search" aria-label="Filter and search catalog">
+    <div class="container">
+
+      <!-- Search -->
+      <div class="catalog-search-row">
+        <div class="catalog-search-wrap">
+          <svg class="catalog-search-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+            viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input type="search" id="catalogSearch" class="catalog-search-input"
+            data-i18n-placeholder="search.placeholder" placeholder="Search items…"
+            autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+
+      <!-- Category filters -->
+      <div class="filter-row">
+        <span class="filter-label" data-i18n="filter.label">Filter:</span>
+        <div class="filter-group">
+          <button class="filter-btn active" data-filter="all"      data-i18n="filter.all">All</button>
+          <button class="filter-btn" data-filter="necklace"        data-i18n="filter.necklaces">Necklaces</button>
+          <button class="filter-btn" data-filter="bangle"          data-i18n="filter.bangles">Bangles</button>
+          <button class="filter-btn" data-filter="earring"         data-i18n="filter.earrings">Earrings</button>
+          <button class="filter-btn" data-filter="ring"            data-i18n="filter.rings">Rings</button>
+          <button class="filter-btn" data-filter="bracelet"        data-i18n="filter.bracelets">Bracelets</button>
+          <button class="filter-btn" data-filter="coin"            data-i18n="filter.coins">Coins &amp; Bars</button>
+        </div>
+      </div>
+
+      <!-- Metal filters (injected by JS) -->
+      <div class="filter-row" id="metalFilterRow" style="display:none;">
+        <span class="filter-label" data-i18n="filter.metal">Metal:</span>
+        <div class="filter-group" id="metalFilterGroup"></div>
+      </div>
+
+      <!-- Purity filters (injected by JS) -->
+      <div class="filter-row" id="purityFilterRow" style="display:none;">
+        <span class="filter-label" data-i18n="filter.purity">Purity:</span>
+        <div class="filter-group" id="purityFilterGroup"></div>
+      </div>
+
+      <!-- Sort + count -->
+      <div class="filter-row filter-bottom-row">
+        <div class="sort-wrap">
+          <span class="filter-label" data-i18n="sort.label">Sort:</span>
+          <select class="sort-select" id="sortSelect" aria-label="Sort items">
+            <option value="recent"      data-i18n="sort.recent">Most Recent</option>
+            <option value="price_asc"   data-i18n="sort.price_asc">Price ↑</option>
+            <option value="price_desc"  data-i18n="sort.price_desc">Price ↓</option>
+            <option value="weight_asc"  data-i18n="sort.weight_asc">Weight ↑</option>
+            <option value="weight_desc" data-i18n="sort.weight_desc">Weight ↓</option>
+          </select>
+        </div>
+        <span class="filter-count" id="productCount" aria-live="polite"></span>
+      </div>
+
     </div>
   </div>
 

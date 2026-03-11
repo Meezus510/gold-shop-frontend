@@ -183,6 +183,83 @@
       cursor: default;
     }
 
+    /* ── Image gallery ── */
+    .image-gallery {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .image-thumb {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .image-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .image-thumb .primary-badge {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,0.55);
+      color: #fff;
+      font-size: 9px;
+      font-weight: 600;
+      letter-spacing: .4px;
+      text-align: center;
+      padding: 2px 4px;
+      text-transform: uppercase;
+    }
+    .image-thumb .remove-btn {
+      position: absolute;
+      top: 3px; right: 3px;
+      width: 20px; height: 20px;
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      border: none;
+      border-radius: 50%;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .image-thumb .remove-btn:hover { background: #C62828; }
+
+    /* ── Image drop zone ── */
+    .upload-dropzone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-md);
+      padding: 24px 16px;
+      text-align: center;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+    .upload-dropzone:hover,
+    .upload-dropzone.drag-over {
+      border-color: var(--gold-dark);
+      background: var(--gold-pale);
+      color: var(--gold-dark);
+    }
+    .upload-dropzone p { margin: 0; font-size: 13px; }
+    .upload-dropzone svg { opacity: .5; }
+    .upload-dropzone:hover svg,
+    .upload-dropzone.drag-over svg { opacity: 1; }
+
     /* ── Metal picker ── */
     .metal-picker {
       display: flex;
@@ -208,6 +285,224 @@
       border-color: var(--gold-dark);
       color: var(--white);
     }
+
+    /* ── Price preview ── */
+    .price-preview {
+      background: var(--gold-pale);
+      border: 1px solid var(--gold-border);
+      border-radius: var(--radius-md);
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .price-preview-title {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .price-preview-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 2px 0;
+    }
+    .price-preview-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-muted);
+    }
+    .price-preview-value {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+    .price-preview-value.accent {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--gold-dark);
+    }
+    .price-preview.below-min {
+      border-color: #FFCDD2;
+      background: #FFF5F5;
+    }
+    .price-preview.below-min .price-preview-value.accent { color: #C62828; }
+    .price-preview-warning {
+      font-size: 11px;
+      font-weight: 600;
+      color: #C62828;
+      margin-top: 6px;
+    }
+
+    /* ── Unit counters in table ── */
+    .unit-counts {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+    .unit-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+    .unit-badge.available { background: #E8F5E9; color: #2E7D32; }
+    .unit-badge.pending   { background: #FFF8E1; color: #F57F17; }
+    .unit-badge.sold      { background: #FAFAFA; color: #757575; border: 1px solid #E0E0E0; }
+    .unit-actions {
+      display: flex;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .btn-unit {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .btn-unit:hover { border-color: var(--gold-dark); color: var(--gold-dark); }
+    .btn-unit.sell:hover   { border-color: #2E7D32; color: #2E7D32; }
+    .btn-unit.restore:hover { border-color: #1565C0; color: #1565C0; }
+
+    /* ── Price sync panel ── */
+    .sync-panel-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      flex-wrap: wrap;
+    }
+    .sync-panel-header h2 {
+      margin: 0;
+      font-family: var(--font-serif);
+      font-size: 18px;
+      color: var(--text-primary);
+    }
+    .sync-info {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .sync-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sync-rates {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .sync-rate-item {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .sync-rate-name {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .sync-rate-value {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      color: var(--gold-dark);
+      font-weight: 700;
+    }
+
+    .sync-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .8px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+    .sync-value {
+      font-family: var(--font-serif);
+      font-size: 15px;
+      color: var(--text-primary);
+    }
+    .btn-sync-all {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .4px;
+      padding: 7px 16px;
+      border-radius: 999px;
+      border: 1px solid var(--gold-border);
+      background: var(--white);
+      color: var(--gold-dark);
+      cursor: pointer;
+      white-space: nowrap;
+      transition: background .15s, border-color .15s;
+    }
+    .btn-sync-all:hover { background: var(--gold-pale); border-color: var(--gold-dark); }
+    .btn-sync-all:disabled { opacity: .5; cursor: default; }
+
+    /* Status badge used inline in table (not as absolute overlay) */
+    .inventory-table .status-badge {
+      position: static;
+      font-size: 11px;
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+      white-space: nowrap;
+      display: inline-block;
+    }
+
+    .table-loc {
+      font-size: 10px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .btn-recalc {
+      font-size: 14px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: color .15s, border-color .15s;
+      line-height: 1.2;
+    }
+    .btn-recalc:hover { color: var(--gold-dark); border-color: var(--gold-dark); }
+    .btn-recalc:disabled { opacity: .4; cursor: default; }
+
+    /* ── New location inline input ── */
+    .new-location-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      align-items: center;
+    }
+    .new-location-row .form-input { flex: 1; margin: 0; }
+    .btn-add-location {
+      padding: 8px 14px;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--gold-dark);
+      background: var(--gold-dark);
+      color: var(--white);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity .15s;
+    }
+    .btn-add-location:hover { opacity: .85; }
 
     @media (max-width: 640px) {
       .form-row { grid-template-columns: 1fr; }
@@ -460,6 +755,60 @@
                 </div>
               </div>
 
+              <!-- Flat Markup -->
+              <div class="form-group">
+                <label class="form-label" for="flatMarkup">
+                  <span data-i18n="form.label.flat_markup">Flat Markup ($)</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="number"
+                  id="flatMarkup"
+                  name="flatMarkup"
+                  placeholder="e.g. 50"
+                  min="0"
+                  step="0.01"
+                  value="0"
+                >
+                <p class="form-hint" data-i18n="form.hint.flat_markup">Fixed dollar amount added on top of metal value × multiplier</p>
+              </div>
+
+              <!-- Manual price (N/A — no metal selected) -->
+              <div class="form-group" id="manualPriceGroup" style="display:none;">
+                <label class="form-label" for="manualPrice">
+                  <span data-i18n="form.label.price">Price (USD)</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="number"
+                  id="manualPrice"
+                  name="manualPrice"
+                  data-i18n-placeholder="form.placeholder.price"
+                  placeholder="e.g. 2150"
+                  min="0"
+                  step="0.01"
+                >
+              </div>
+
+              <!-- Price preview (metal items only) -->
+              <div id="pricePreview" class="price-preview" style="display:none;" aria-live="polite">
+                <div class="price-preview-title" data-i18n="preview.title">Price Preview</div>
+                <div class="price-preview-row">
+                  <span class="price-preview-label" data-i18n="preview.market_rate">Metal value</span>
+                  <span class="price-preview-value" id="previewMarketRate">—</span>
+                </div>
+                <div class="price-preview-row">
+                  <span class="price-preview-label" data-i18n="preview.listing_price">Listing price</span>
+                  <span class="price-preview-value accent" id="previewListingPrice">—</span>
+                </div>
+                <div class="price-preview-row" id="previewMinRow" style="display:none;">
+                  <span class="price-preview-label" data-i18n="preview.min_price">Minimum (cost + 10%)</span>
+                  <span class="price-preview-value" id="previewMin">—</span>
+                </div>
+                <p class="price-preview-warning" id="previewWarning" style="display:none;"
+                  data-i18n="preview.below_min">Below minimum — raise multiplier or markup</p>
+              </div>
+
               <!-- Cost + Status -->
               <div class="form-row">
                 <div class="form-group">
@@ -506,20 +855,77 @@
                 <p class="form-hint" data-i18n="form.hint.sell_price">Actual price the item sold for</p>
               </div>
 
-              <!-- Image URL -->
+              <!-- Quantity + Purchase Location -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="quantity">
+                    <span data-i18n="form.label.quantity">Quantity</span>
+                  </label>
+                  <input
+                    class="form-input"
+                    type="number"
+                    id="quantity"
+                    name="quantity"
+                    value="1"
+                    min="1"
+                    step="1"
+                  >
+                </div>
+                <div class="form-group">
+                  <!-- spacer — keeps grid balanced -->
+                </div>
+              </div>
+
+              <!-- Purchase Location -->
               <div class="form-group">
-                <label class="form-label" for="imageUrl">
-                  <span data-i18n="form.label.image">Image URL</span>
+                <label class="form-label" for="purchaseLocation">
+                  <span data-i18n="form.label.location">Purchase Location</span>
                 </label>
-                <input
-                  class="form-input"
-                  type="url"
-                  id="imageUrl"
-                  name="imageUrl"
-                  placeholder="https://cdn.example.com/image.jpg"
-                  autocomplete="off"
-                >
-                <p class="form-hint" data-i18n="form.hint.image">Paste a hosted image URL (Cloudinary, Imgur, etc.)</p>
+                <select class="form-select" id="purchaseLocation" name="purchaseLocation">
+                  <!-- Populated by app.js -->
+                </select>
+                <!-- Inline "add new" row — shown when "+ Add new location…" is selected -->
+                <div id="newLocationGroup" class="new-location-row" style="display:none;">
+                  <input
+                    class="form-input"
+                    type="text"
+                    id="newLocationName"
+                    data-i18n-placeholder="form.location.placeholder"
+                    placeholder="e.g. Joyeria Broadway"
+                    autocomplete="off"
+                  >
+                  <button type="button" id="addLocationBtn" class="btn-add-location"
+                    data-i18n="form.location.add_btn">Add</button>
+                </div>
+              </div>
+
+              <!-- Multi-image upload -->
+              <div class="form-group">
+                <label class="form-label">
+                  <span data-i18n="form.label.images">Images</span>
+                </label>
+
+                <!-- Thumbnail gallery (populated by JS) -->
+                <div id="imageGallery" class="image-gallery" style="display:none;"></div>
+
+                <!-- Drop zone -->
+                <div id="dropZone" class="upload-dropzone" role="button" tabindex="0"
+                  aria-label="Click or drag images to upload">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
+                    fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
+                    stroke-linejoin="round" aria-hidden="true">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                    <polyline points="17 8 12 3 7 8"/>
+                    <line x1="12" y1="3" x2="12" y2="15"/>
+                  </svg>
+                  <p data-i18n="upload.text">Click or drag &amp; drop to upload</p>
+                  <p class="form-hint" data-i18n="upload.hint">JPG, PNG, WEBP — max 10 MB · multiple files OK</p>
+                  <input type="file" id="imageFile" accept="image/jpeg,image/png,image/webp"
+                    multiple style="display:none;" aria-hidden="true">
+                </div>
+
+                <!-- Upload progress / status -->
+                <p id="uploadStatus" class="form-hint" style="min-height:16px;margin-top:4px;"></p>
               </div>
 
               <!-- Actions -->
@@ -541,6 +947,27 @@
 
         <!-- ── Right: Stats + Inventory table ─────────────── -->
         <section aria-label="Inventory overview">
+
+          <!-- Price sync panel -->
+          <div id="priceSyncPanel" class="admin-panel" style="margin-bottom:16px;">
+            <div class="sync-panel-header">
+              <h2 data-i18n="sync.title">Price Sync</h2>
+              <button id="updateAllPricesBtn" class="btn-sync-all" type="button"
+                data-i18n="sync.update_all">Update All Prices</button>
+            </div>
+            <div class="sync-info">
+              <div class="sync-stat">
+                <span class="sync-label" data-i18n="sync.last_updated">Last updated</span>
+                <span class="sync-value" id="syncLastUpdated">—</span>
+              </div>
+              <div class="sync-stat">
+                <span class="sync-label" data-i18n="sync.next_update">Next auto-update</span>
+                <span class="sync-value" id="syncCountdown">—</span>
+              </div>
+            </div>
+            <!-- Per-gram spot rates (populated by JS after spot prices load) -->
+            <div id="syncRates" class="sync-rates" style="display:none;"></div>
+          </div>
 
           <!-- Stats row -->
           <div class="stats-row" id="statsRow" aria-label="Inventory statistics">

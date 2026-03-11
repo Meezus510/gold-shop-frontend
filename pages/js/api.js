@@ -60,6 +60,7 @@ function _normalizePublic(item) {
 function _normalizeAdmin(item) {
   const en = item.translations?.find(t => t.language === 'en') || {};
   const es = item.translations?.find(t => t.language === 'es') || {};
+  const imagesSorted = (item.images || []).slice().sort((a, b) => a.position - b.position);
   return {
     ...item,
     id:             item.item_id,
@@ -67,6 +68,14 @@ function _normalizeAdmin(item) {
     description:    en.description || '',
     name_es:        es.name        || '',
     description_es: es.description || '',
+    image_url:      imagesSorted[0]?.url || null,
+    image_urls:     imagesSorted.map(img => img.url),
+    flat_markup:        item.flat_markup        ?? null,
+    quantity:           item.quantity            ?? 1,
+    quantity_available: item.quantity_available  ?? 0,
+    quantity_pending:   item.quantity_pending    ?? 0,
+    quantity_sold:      item.quantity_sold       ?? 0,
+    purchase_location:  item.purchase_location   ?? null,
   };
 }
 
@@ -97,6 +106,24 @@ async function apiLogin(username, password) {
 
 async function apiGetMetals() {
   return _apiFetch('/metals');
+}
+
+async function apiGetSpotPrices(token) {
+  return _apiFetch('/metals/spot-prices', { headers: _authHeaders(token) });
+}
+
+/* ── Purchase locations ─────────────────────────────────────── */
+
+async function apiGetLocations(token) {
+  return _apiFetch('/locations', { headers: _authHeaders(token) });
+}
+
+async function apiCreateLocation(token, name) {
+  return _apiFetch('/locations', {
+    method:  'POST',
+    headers: _authHeaders(token),
+    body:    JSON.stringify({ name }),
+  });
 }
 
 /* ── Admin items ───────────────────────────────────────────── */
@@ -131,4 +158,48 @@ async function apiAdminDeleteItem(token, id) {
     method:  'DELETE',
     headers: _authHeaders(token),
   });
+}
+
+async function apiAdjustUnits(token, id, fromState, toState, units = 1) {
+  return _apiFetch(`/admin/items/${id}/units`, {
+    method:  'PATCH',
+    headers: _authHeaders(token),
+    body:    JSON.stringify({ from_state: fromState, to_state: toState, units }),
+  });
+}
+
+async function apiRecalculateItemPrice(token, id) {
+  const data = await _apiFetch(`/admin/items/${id}/recalculate-price`, {
+    method:  'POST',
+    headers: _authHeaders(token),
+  });
+  return _normalizeAdmin(data);
+}
+
+async function apiRecalculateAllPrices(token) {
+  return _apiFetch('/metals/recalculate-all-prices', {
+    method:  'POST',
+    headers: _authHeaders(token),
+  });
+}
+
+async function apiGetSyncStatus(token) {
+  return _apiFetch('/metals/price-sync-status', { headers: _authHeaders(token) });
+}
+
+/* ── Image upload ──────────────────────────────────────────── */
+
+/**
+ * Uploads a File object to Cloudinary via the backend.
+ * Returns the secure image URL string.
+ */
+async function apiUploadImage(token, file) {
+  const form = new FormData();
+  form.append('file', file);
+  const data = await _apiFetch('/admin/upload-image', {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}` }, // no Content-Type — browser sets multipart boundary
+    body:    form,
+  });
+  return data.url;
 }

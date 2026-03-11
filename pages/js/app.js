@@ -39,6 +39,17 @@ function categoryIcon(category) {
   return CATEGORY_ICONS[category?.toLowerCase()] || CATEGORY_ICONS.default;
 }
 
+/**
+ * Returns a human-readable purity string (e.g. "22k Gold", "Silver 925")
+ * or null if the item has no metal / purity data.
+ */
+function formatPurity(product) {
+  if (!product.metal || !product.purity_karat) return null;
+  const denom = product.metal.purity_denominator;
+  if (denom === 24) return `${product.purity_karat}k ${product.metal.name}`;
+  return `${product.metal.name} ${product.purity_karat}`;
+}
+
 /** For public items the API already resolved the language into `name`. */
 function productName(product) {
   if (getLang() === 'es' && product.name_es) return product.name_es;
@@ -131,7 +142,7 @@ function createProductCard(product) {
       <h3 class="card-name">${escapeHTML(productName(product))}</h3>
       <p class="card-desc">${escapeHTML(productDesc(product))}</p>
       <div class="card-meta">
-        <span class="card-weight">${product.weight_grams}g</span>
+        <span class="card-weight">${product.weight_grams}g${formatPurity(product) ? ` · ${escapeHTML(formatPurity(product))}` : ''}</span>
         <span class="card-price">${formatPrice(product.price)}</span>
       </div>
     </div>
@@ -151,60 +162,185 @@ function createProductCard(product) {
 /* ── Catalog page ──────────────────────────────────────────── */
 
 async function initCatalog() {
-  const grid       = document.getElementById('productGrid');
-  const countEl    = document.getElementById('productCount');
-  const filterBtns = document.querySelectorAll('.filter-btn');
+  const grid        = document.getElementById('productGrid');
+  const countEl     = document.getElementById('productCount');
+  const searchInput = document.getElementById('catalogSearch');
+  const sortSelect  = document.getElementById('sortSelect');
 
   if (!grid) return;
 
-  let activeFilter = 'all';
-  let allProducts  = [];
+  // ── Filter state — empty Set = "all" ──
+  let activeCategories = new Set();
+  let activeMetals     = new Set();
+  let activePurities   = new Set();
+  let searchQuery = '';
+  let sortBy      = 'recent';
+  let allProducts = [];
 
-  function render(filter) {
-    const filtered = filter === 'all'
-      ? allProducts
-      : allProducts.filter(p => p.category?.toLowerCase() === filter);
+  // ── Apply all active filters + sort, then render ──
+  function applyAndRender() {
+    let result = allProducts;
 
-    grid.innerHTML = '';
-
-    if (filtered.length === 0) {
-      grid.innerHTML = `
-        <div class="grid-empty">
-          <div class="empty-icon">🔍</div>
-          <p>${t('grid.empty')}</p>
-        </div>`;
-    } else {
-      const frag = document.createDocumentFragment();
-      filtered.forEach(p => frag.appendChild(createProductCard(p)));
-      grid.appendChild(frag);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(p =>
+        (p.name        || '').toLowerCase().includes(q) ||
+        (p.description || '').toLowerCase().includes(q)
+      );
     }
 
+    if (activeCategories.size > 0)
+      result = result.filter(p => activeCategories.has(p.category?.toLowerCase()));
+
+    if (activeMetals.size > 0)
+      result = result.filter(p => p.metal && activeMetals.has(p.metal.name.toLowerCase()));
+
+    if (activePurities.size > 0)
+      result = result.filter(p => activePurities.has(p.purity_karat));
+
+    result = [...result];
+    if (sortBy === 'price_asc')
+      result.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
+    else if (sortBy === 'price_desc')
+      result.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
+    else if (sortBy === 'weight_asc')
+      result.sort((a, b) => (a.weight_grams ?? Infinity) - (b.weight_grams ?? Infinity));
+    else if (sortBy === 'weight_desc')
+      result.sort((a, b) => (b.weight_grams ?? -Infinity) - (a.weight_grams ?? -Infinity));
+
+    grid.innerHTML = '';
+    if (result.length === 0) {
+      grid.innerHTML = `<div class="grid-empty"><div class="empty-icon">🔍</div><p>${t('grid.empty')}</p></div>`;
+    } else {
+      const frag = document.createDocumentFragment();
+      result.forEach(p => frag.appendChild(createProductCard(p)));
+      grid.appendChild(frag);
+    }
     if (countEl) {
-      const n = filtered.length;
+      const n = result.length;
       countEl.textContent = n === 1 ? t('count.one') : t('count.many', { n });
     }
   }
 
-  // Show loading state
-  grid.innerHTML = `<div class="grid-empty"><p>Loading…</p></div>`;
+  // ── Category pills (static in HTML, multi-select) ──
+  function initCategoryFilters() {
+    const allBtn  = document.querySelector('[data-filter="all"]');
+    const catBtns = document.querySelectorAll('[data-filter]:not([data-filter="all"])');
 
+    allBtn?.addEventListener('click', () => {
+      activeCategories.clear();
+      allBtn.classList.add('active');
+      catBtns.forEach(b => b.classList.remove('active'));
+      applyAndRender();
+    });
+
+    catBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.filter;
+        if (activeCategories.has(val)) {
+          activeCategories.delete(val);
+          btn.classList.remove('active');
+        } else {
+          activeCategories.add(val);
+          btn.classList.add('active');
+        }
+        if (activeCategories.size === 0) allBtn?.classList.add('active');
+        else                              allBtn?.classList.remove('active');
+        applyAndRender();
+      });
+    });
+  }
+
+  // ── Metal pills (dynamic, multi-select) ──
+  function buildMetalFilters(products) {
+    const row   = document.getElementById('metalFilterRow');
+    const group = document.getElementById('metalFilterGroup');
+    if (!row || !group) return;
+
+    const seen = [...new Map(
+      products.filter(p => p.metal)
+              .map(p => [p.metal.name.toLowerCase(), p.metal.name])
+    ).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+
+    if (seen.length === 0) return;
+
+    seen.forEach(([key, name]) => {
+      const btn = document.createElement('button');
+      btn.className = 'filter-btn';
+      btn.textContent = name;
+      btn.addEventListener('click', () => {
+        if (activeMetals.has(key)) { activeMetals.delete(key); btn.classList.remove('active'); }
+        else                       { activeMetals.add(key);    btn.classList.add('active'); }
+        applyAndRender();
+      });
+      group.appendChild(btn);
+    });
+    row.style.display = '';
+  }
+
+  // ── Purity pills (dynamic, multi-select) ──
+  function buildPurityFilters(products) {
+    const row   = document.getElementById('purityFilterRow');
+    const group = document.getElementById('purityFilterGroup');
+    if (!row || !group) return;
+
+    const seen = new Map();
+    products.forEach(p => {
+      if (p.purity_karat && p.metal && !seen.has(p.purity_karat)) {
+        const label = p.metal.purity_denominator === 24
+          ? `${p.purity_karat}k`
+          : `${p.purity_karat}`;
+        seen.set(p.purity_karat, label);
+      }
+    });
+
+    if (seen.size === 0) return;
+
+    [...seen.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .forEach(([karat, label]) => {
+        const btn = document.createElement('button');
+        btn.className = 'filter-btn';
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+          if (activePurities.has(karat)) { activePurities.delete(karat); btn.classList.remove('active'); }
+          else                           { activePurities.add(karat);    btn.classList.add('active'); }
+          applyAndRender();
+        });
+        group.appendChild(btn);
+      });
+    row.style.display = '';
+  }
+
+  // ── Sort ──
+  sortSelect?.addEventListener('change', () => {
+    sortBy = sortSelect.value;
+    applyAndRender();
+  });
+
+  // ── Search (debounced 300ms) ──
+  let _searchTimer;
+  searchInput?.addEventListener('input', () => {
+    clearTimeout(_searchTimer);
+    _searchTimer = setTimeout(() => {
+      searchQuery = searchInput.value.trim();
+      applyAndRender();
+    }, 300);
+  });
+
+  // ── Load data ──
+  grid.innerHTML = `<div class="grid-empty"><p>Loading…</p></div>`;
   try {
     allProducts = await apiFetchItems(getLang());
-  } catch (err) {
+  } catch (_) {
     grid.innerHTML = `<div class="grid-empty"><p>Could not load items. Please try again later.</p></div>`;
     return;
   }
 
-  filterBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      filterBtns.forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
-      activeFilter = btn.dataset.filter || 'all';
-      render(activeFilter);
-    });
-  });
-
-  render(activeFilter);
+  initCategoryFilters();
+  buildMetalFilters(allProducts);
+  buildPurityFilters(allProducts);
+  applyAndRender();
 }
 
 /* ── Detail page ───────────────────────────────────────────── */
@@ -230,6 +366,23 @@ async function initDetail() {
   setTextContent('detailDesc',     productDesc(product));
   setTextContent('detailWeight',   product.weight_grams);
   setTextContent('detailPrice',    formatPrice(product.price));
+
+  // Inject purity spec if available
+  const purityStr = formatPurity(product);
+  const specsEl   = document.querySelector('.detail-specs');
+  const existingPurity = document.getElementById('detailPuritySpec');
+  if (existingPurity) existingPurity.remove();
+  if (purityStr && specsEl) {
+    const priceSpec = specsEl.children[1]; // insert before price
+    const puritySpec = document.createElement('div');
+    puritySpec.className = 'spec-item';
+    puritySpec.id = 'detailPuritySpec';
+    puritySpec.innerHTML = `
+      <div class="spec-label">${t('spec.purity')}</div>
+      <div class="spec-value">${escapeHTML(purityStr)}</div>
+    `;
+    specsEl.insertBefore(puritySpec, priceSpec);
+  }
 
   const badge = document.getElementById('detailBadge');
   if (badge) {
@@ -352,9 +505,116 @@ async function loadAdminPage(token) {
   let editingId     = null;
   let selectedMetal = null;   // { id, name, symbol, purity_denominator, … } or null for N/A
 
-  /* -- Metal picker -- */
+  /* -- Metal picker + spot prices -- */
   let metals = [];
+  let spotPriceMap = {};  // metal_id → price per troy oz
+
   try { metals = await apiGetMetals(); } catch (_) { /* non-fatal */ }
+
+  let spotPricesFetching = false;
+  let spotPricesFailed   = false;
+
+  async function loadSpotPrices() {
+    if (spotPricesFetching) return;
+    spotPricesFetching = true;
+    spotPricesFailed   = false;
+    try {
+      const spots = await apiGetSpotPrices(token);
+      spots.forEach(s => { spotPriceMap[s.metal_id] = s.spot_price_usd_per_oz; });
+      spotPricesFailed = spots.length === 0;
+    } catch (_) {
+      spotPricesFailed = true;
+    } finally {
+      spotPricesFetching = false;
+    }
+    updatePricePreview();
+    updateRatesDisplay();
+  }
+
+  /* -- Spot rates display (per gram) -- */
+  const syncRatesEl = document.getElementById('syncRates');
+
+  function updateRatesDisplay() {
+    if (!syncRatesEl) return;
+    const items = metals.filter(m => spotPriceMap[m.id]);
+    if (items.length === 0) { syncRatesEl.style.display = 'none'; return; }
+    syncRatesEl.innerHTML = items.map(m => {
+      const perGram = spotPriceMap[m.id] / GRAMS_PER_OZ;
+      return `<div class="sync-rate-item">
+        <span class="sync-rate-name">${escapeHTML(m.name)}</span>
+        <span class="sync-rate-value">${formatPrice(perGram)}<span style="font-size:11px;font-weight:400;color:var(--text-muted)">/g</span></span>
+      </div>`;
+    }).join('');
+    syncRatesEl.style.display = '';
+  }
+
+  // Initial load — non-blocking, fires once on page load
+  loadSpotPrices();
+
+  /* -- Purchase locations -- */
+  let locations = [];
+  const locationSelect    = document.getElementById('purchaseLocation');
+  const newLocationGroup  = document.getElementById('newLocationGroup');
+  const newLocationInput  = document.getElementById('newLocationName');
+  const addLocationBtn    = document.getElementById('addLocationBtn');
+
+  try { locations = await apiGetLocations(token); } catch (_) { /* non-fatal */ }
+
+  function populateLocationSelect(selectedId) {
+    if (!locationSelect) return;
+    locationSelect.innerHTML = '';
+    const noneOpt = document.createElement('option');
+    noneOpt.value = '';
+    noneOpt.textContent = t('form.location.none');
+    locationSelect.appendChild(noneOpt);
+
+    locations.forEach(loc => {
+      const opt = document.createElement('option');
+      opt.value = loc.id;
+      opt.textContent = loc.name;
+      locationSelect.appendChild(opt);
+    });
+
+    const addOpt = document.createElement('option');
+    addOpt.value = '__new__';
+    addOpt.textContent = t('form.location.add_new');
+    locationSelect.appendChild(addOpt);
+
+    if (selectedId) locationSelect.value = selectedId;
+  }
+
+  populateLocationSelect();
+
+  locationSelect?.addEventListener('change', () => {
+    if (newLocationGroup) {
+      newLocationGroup.style.display = locationSelect.value === '__new__' ? '' : 'none';
+    }
+  });
+
+  addLocationBtn?.addEventListener('click', async () => {
+    const name = newLocationInput?.value.trim();
+    if (!name) return;
+    addLocationBtn.disabled = true;
+    try {
+      const loc = await apiCreateLocation(token, name);
+      locations.push(loc);
+      locations.sort((a, b) => a.name.localeCompare(b.name));
+      populateLocationSelect(loc.id);
+      if (newLocationGroup) newLocationGroup.style.display = 'none';
+      if (newLocationInput) newLocationInput.value = '';
+    } catch (err) {
+      if (err.status === 409) {
+        // Already exists — just select it
+        const existing = locations.find(l => l.name.toLowerCase() === name.toLowerCase());
+        if (existing) { populateLocationSelect(existing.id); newLocationGroup.style.display = 'none'; }
+        else showToast(err.message || 'Location already exists.', 'error');
+      } else {
+        showToast(err.message || 'Failed to add location.', 'error');
+      }
+    } finally {
+      addLocationBtn.disabled = false;
+    }
+  });
 
   const metalPicker = document.getElementById('metalPicker');
   const metalIdInput = document.getElementById('metalId');
@@ -373,8 +633,10 @@ async function loadAdminPage(token) {
       });
     }
 
-    // Show/hide karat field
+    // Show/hide karat field and manual price field
     if (karatGroup) karatGroup.style.display = metal ? '' : 'none';
+    const manualPriceGroup = document.getElementById('manualPriceGroup');
+    if (manualPriceGroup) manualPriceGroup.style.display = metal ? 'none' : '';
 
     // Update karat placeholder + hint based on metal
     if (metal && purityKarat) {
@@ -387,6 +649,64 @@ async function loadAdminPage(token) {
         if (karatHint) karatHint.textContent = t('form.hint.karat.millesimal', { denom });
       }
     }
+
+    updatePricePreview();
+  }
+
+  /* -- Price preview -- */
+  const pricePreview        = document.getElementById('pricePreview');
+  const previewMarketRate   = document.getElementById('previewMarketRate');
+  const previewListingPrice = document.getElementById('previewListingPrice');
+  const previewMinRow       = document.getElementById('previewMinRow');
+  const previewMin          = document.getElementById('previewMin');
+  const previewWarning      = document.getElementById('previewWarning');
+
+  const GRAMS_PER_OZ = 31.1035;
+
+  function updatePricePreview() {
+    if (!selectedMetal || !pricePreview) return;
+
+    pricePreview.style.display = '';
+
+    const spotPrice   = spotPriceMap[selectedMetal.id];
+    const weightGrams = parseFloat(document.getElementById('weight')?.value);
+    const karat       = parseFloat(purityKarat?.value);
+    const multiplier  = parseFloat(document.getElementById('priceMultiplier')?.value);
+    const flatMarkup  = parseFloat(document.getElementById('flatMarkup')?.value) || 0;
+    const denom       = selectedMetal.purity_denominator;
+
+    // Spot price not yet available
+    if (!spotPrice) {
+      if (previewMarketRate) previewMarketRate.textContent = '—';
+      if (previewListingPrice) {
+        previewListingPrice.textContent = spotPricesFetching ? 'Fetching…'
+          : spotPricesFailed            ? 'Spot price unavailable'
+          :                               '—';
+      }
+      return;
+    }
+
+    if (isNaN(weightGrams) || isNaN(karat) || isNaN(multiplier)) {
+      if (previewMarketRate)   previewMarketRate.textContent   = '—';
+      if (previewListingPrice) previewListingPrice.textContent = '—';
+      return;
+    }
+
+    const marketRate   = (weightGrams / GRAMS_PER_OZ) * spotPrice * (karat / denom);
+    const listingPrice = marketRate * multiplier + flatMarkup;
+
+    if (previewMarketRate)   previewMarketRate.textContent   = formatPrice(marketRate);
+    if (previewListingPrice) previewListingPrice.textContent = formatPrice(listingPrice);
+
+    // Minimum price rule: listing must be >= cost * 1.1
+    const cost    = parseFloat(document.getElementById('cost')?.value);
+    const minPrice = (!isNaN(cost) && cost > 0) ? cost * 1.1 : null;
+    const belowMin = minPrice !== null && listingPrice < minPrice;
+
+    if (previewMinRow)  previewMinRow.style.display  = minPrice !== null ? '' : 'none';
+    if (previewMin)     previewMin.textContent        = minPrice !== null ? formatPrice(minPrice) : '—';
+    if (previewWarning) previewWarning.style.display  = belowMin ? '' : 'none';
+    if (pricePreview)   pricePreview.classList.toggle('below-min', belowMin);
   }
 
   if (metalPicker) {
@@ -410,6 +730,12 @@ async function loadAdminPage(token) {
       metalPicker.appendChild(btn);
     });
   }
+
+  // Wire live price preview on input changes
+  ['weight', 'priceMultiplier', 'flatMarkup', 'cost'].forEach(id => {
+    document.getElementById(id)?.addEventListener('input', updatePricePreview);
+  });
+  purityKarat?.addEventListener('input', updatePricePreview);
 
   /* -- Logout -- */
   if (logoutBtn) {
@@ -453,15 +779,42 @@ async function loadAdminPage(token) {
         ? `<img class="table-img" src="${escapeAttr(p.image_url)}" alt="${escapeAttr(p.name)}" onerror="this.parentElement.innerHTML='<div class=\\'table-img-placeholder\\'>${categoryIcon(p.category)}</div>'">`
         : `<div class="table-img-placeholder">${categoryIcon(p.category)}</div>`;
 
+      const isMulti    = p.quantity > 1;
+      // Build detail sub-line: metal · purity · multiplier
+      const metalDetail = (() => {
+        if (!p.metal) return '';
+        const purity = p.purity_karat
+          ? (p.metal.purity_denominator === 24 ? `${p.purity_karat}k` : `${p.purity_karat}`)
+          : '';
+        const mult = (p.price_multiplier && p.price_multiplier !== 1) ? `×${p.price_multiplier}` : '';
+        return [p.metal.name, purity, mult].filter(Boolean).join(' · ');
+      })();
+      const locationDetail = p.purchase_location?.name || '';
+
+      // Status cell: badge for single-unit; unit counters for multi-unit
+      const statusCell = isMulti
+        ? `<div class="unit-counts">
+             <span class="unit-badge available">${p.quantity_available} ${t('units.available')}</span>
+             ${p.quantity_pending > 0 ? `<span class="unit-badge pending">${p.quantity_pending} ${t('units.pending')}</span>` : ''}
+             ${p.quantity_sold    > 0 ? `<span class="unit-badge sold">${p.quantity_sold} ${t('units.sold')}</span>` : ''}
+           </div>
+           <div class="unit-actions">
+             ${p.quantity_available > 0 ? `<button class="btn-unit sell"    data-action="sell"    data-id="${p.id}">${t('btn.sell_one')}</button>` : ''}
+             ${p.quantity_available > 0 ? `<button class="btn-unit pending" data-action="pending" data-id="${p.id}">${t('btn.pending_one')}</button>` : ''}
+             ${p.quantity_pending   > 0 ? `<button class="btn-unit restore" data-action="restore" data-id="${p.id}">${t('btn.restore')}</button>` : ''}
+           </div>`
+        : `<span class="status-badge ${statusClass(p.status)}">${statusLabel(p.status)}</span>`;
+
       tr.innerHTML = `
         <td>${imgHTML}</td>
         <td>
           <div class="table-name">${escapeHTML(productName(p))}</div>
-          <div class="table-sub">${escapeHTML(categoryLabel(p.category))}</div>
+          <div class="table-sub">${escapeHTML(categoryLabel(p.category))}${metalDetail ? ' · ' + escapeHTML(metalDetail) : ''}</div>
+          ${locationDetail ? `<div class="table-loc">${escapeHTML(locationDetail)}</div>` : ''}
         </td>
-        <td class="hide-mobile">${p.weight_grams}g</td>
+        <td class="hide-mobile">${p.weight_grams ? p.weight_grams + 'g' : '—'}</td>
         <td>${formatPrice(p.price)}</td>
-        <td><span class="status-badge ${statusClass(p.status)}">${statusLabel(p.status)}</span></td>
+        <td>${statusCell}</td>
         <td>
           <div class="table-actions">
             <button class="btn-edit"   data-id="${p.id}">${t('btn.edit')}</button>
@@ -472,45 +825,235 @@ async function loadAdminPage(token) {
 
       tr.querySelector('.btn-edit').addEventListener('click',   () => startEdit(p));
       tr.querySelector('.btn-delete').addEventListener('click', () => deleteProduct(p.id));
+
+      // Unit action buttons (multi-unit items only)
+      tr.querySelectorAll('.btn-unit').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            const action = btn.dataset.action;
+            const id     = parseInt(btn.dataset.id, 10);
+            if (action === 'sell')    await apiAdjustUnits(token, id, 'available', 'sold');
+            if (action === 'pending') await apiAdjustUnits(token, id, 'available', 'pending');
+            if (action === 'restore') await apiAdjustUnits(token, id, 'pending',   'available');
+            await reloadTable();
+          } catch (err) {
+            if (err.status === 401) { handleAuthError(); return; }
+            showToast(err.message || 'Failed to update units.', 'error');
+            btn.disabled = false;
+          }
+        });
+      });
+
       tableBody.appendChild(tr);
     });
   }
 
+  /* -- Price sync panel -- */
+  const updateAllBtn      = document.getElementById('updateAllPricesBtn');
+  const syncLastUpdatedEl = document.getElementById('syncLastUpdated');
+  const syncCountdownEl   = document.getElementById('syncCountdown');
+
+  let syncNextAt = null;
+
+  function formatCountdown(target) {
+    const diff = target - Date.now();
+    if (diff <= 0) return t('sync.overdue');
+    const days  = Math.floor(diff / 86400000);
+    const hours = Math.floor((diff % 86400000) / 3600000);
+    const mins  = Math.floor((diff % 3600000)  / 60000);
+    if (days > 0)  return `${days}d ${hours}h ${mins}m`;
+    if (hours > 0) return `${hours}h ${mins}m`;
+    return `${mins}m`;
+  }
+
+  function updateCountdownDisplay() {
+    if (!syncCountdownEl) return;
+    syncCountdownEl.textContent = syncNextAt ? formatCountdown(syncNextAt) : '—';
+  }
+
+  async function loadSyncStatus() {
+    try {
+      const s = await apiGetSyncStatus(token);
+      syncNextAt = s.next_sync_at ? new Date(s.next_sync_at) : null;
+      if (syncLastUpdatedEl) {
+        syncLastUpdatedEl.textContent = s.last_sync_at
+          ? new Date(s.last_sync_at).toLocaleString()
+          : t('sync.never');
+      }
+      updateCountdownDisplay();
+    } catch (_) { /* non-fatal */ }
+  }
+
+  await loadSyncStatus();
+  const _countdownInterval = setInterval(updateCountdownDisplay, 60000);
+  // Re-poll sync status every 5 minutes
+  setInterval(loadSyncStatus, 5 * 60 * 1000);
+
+  if (updateAllBtn) {
+    updateAllBtn.addEventListener('click', async () => {
+      if (!confirm(t('sync.confirm_all'))) return;
+      updateAllBtn.disabled    = true;
+      updateAllBtn.textContent = t('sync.updating');
+      try {
+        const result = await apiRecalculateAllPrices(token);
+        syncNextAt = result.next_sync_at ? new Date(result.next_sync_at) : null;
+        updateCountdownDisplay();
+        if (syncLastUpdatedEl) syncLastUpdatedEl.textContent = new Date().toLocaleString();
+        showToast(`${t('sync.updated')}: ${result.total_updated} items`, 'success');
+        await reloadTable();
+      } catch (err) {
+        if (err.status === 401) { handleAuthError(); return; }
+        showToast(err.message || 'Failed to update prices.', 'error');
+      } finally {
+        updateAllBtn.disabled    = false;
+        updateAllBtn.textContent = t('sync.update_all');
+      }
+    });
+  }
+
+  /* -- Multi-image upload wiring -- */
+  const dropZone       = document.getElementById('dropZone');
+  const imageFileInput = document.getElementById('imageFile');
+  const imageGallery   = document.getElementById('imageGallery');
+  const uploadStatus   = document.getElementById('uploadStatus');
+
+  // In-memory ordered list of image URLs for the current form session
+  let imageUrls = [];
+
+  function renderGallery() {
+    if (!imageGallery) return;
+    imageGallery.innerHTML = '';
+    if (imageUrls.length === 0) {
+      imageGallery.style.display = 'none';
+      return;
+    }
+    imageGallery.style.display = '';
+    imageUrls.forEach((url, idx) => {
+      const thumb = document.createElement('div');
+      thumb.className = 'image-thumb';
+      thumb.innerHTML = `
+        <img src="${escapeAttr(url)}" alt="Image ${idx + 1}">
+        ${idx === 0 ? '<div class="primary-badge">Primary</div>' : ''}
+        <button type="button" class="remove-btn" aria-label="Remove image ${idx + 1}">✕</button>
+      `;
+      thumb.querySelector('.remove-btn').addEventListener('click', () => {
+        imageUrls.splice(idx, 1);
+        renderGallery();
+      });
+      imageGallery.appendChild(thumb);
+    });
+  }
+
+  async function handleFiles(files) {
+    if (!files || files.length === 0) return;
+    const fileArray = Array.from(files);
+    uploadStatus.textContent = fileArray.length > 1
+      ? `Uploading ${fileArray.length} images…`
+      : 'Uploading…';
+    uploadStatus.style.color = 'var(--gold-dark)';
+    dropZone.classList.add('drag-over');
+
+    let successCount = 0;
+    const errors = [];
+    // Upload in parallel
+    await Promise.all(fileArray.map(async file => {
+      try {
+        const url = await apiUploadImage(token, file);
+        imageUrls.push(url);
+        successCount++;
+      } catch (err) {
+        errors.push(file.name + ': ' + err.message);
+      }
+    }));
+
+    dropZone.classList.remove('drag-over');
+    renderGallery();
+
+    if (errors.length === 0) {
+      uploadStatus.textContent = `✓ ${successCount} image${successCount > 1 ? 's' : ''} uploaded`;
+      uploadStatus.style.color = '#2E7D32';
+    } else {
+      uploadStatus.textContent = `${successCount} uploaded, ${errors.length} failed: ${errors[0]}`;
+      uploadStatus.style.color = '#C62828';
+    }
+    if (imageFileInput) imageFileInput.value = '';
+  }
+
+  if (dropZone) {
+    dropZone.addEventListener('click', () => imageFileInput.click());
+    dropZone.addEventListener('keydown', e => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); imageFileInput.click(); }
+    });
+    dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      handleFiles(e.dataTransfer.files);
+    });
+  }
+
+  if (imageFileInput) {
+    imageFileInput.addEventListener('change', () => handleFiles(imageFileInput.files));
+  }
+
   /* -- Show/hide sell price based on status -- */
   const sellPriceGroup = document.getElementById('sellPriceGroup');
+  const statusSelect = document.getElementById('status');
   function updateSellPriceVisibility() {
-    const status = form.status.value;
+    const status = statusSelect?.value;
     if (sellPriceGroup) {
       sellPriceGroup.style.display = (status === 'SOLD' || status === 'SALE_PENDING') ? '' : 'none';
     }
   }
-  form.status.addEventListener('change', updateSellPriceVisibility);
+  statusSelect?.addEventListener('change', updateSellPriceVisibility);
   updateSellPriceVisibility();
 
   /* -- Build API payload from form -- */
   function buildPayload() {
-    const translations = [];
-    const enName = form.productName.value.trim();
-    const esName = form.productNameEs.value.trim();
-    if (enName) translations.push({ language: 'en', name: enName, description: form.description.value.trim() || null });
-    if (esName) translations.push({ language: 'es', name: esName, description: form.descriptionEs.value.trim() || null });
+    const fld = id => document.getElementById(id);
 
-    const costVal        = parseFloat(form.cost.value);
-    const sellPriceVal   = parseFloat(form.sellPrice.value);
-    const weightVal      = parseFloat(form.weight.value);
-    const multiplierVal  = parseFloat(form.priceMultiplier.value);
-    const purityKaratVal = parseFloat(form.purityKarat.value);
+    const enName = fld('productName')?.value.trim()   || '';
+    const esName = fld('productNameEs')?.value.trim() || '';
+
+    const translations = [];
+    if (enName) translations.push({ language: 'en', name: enName, description: fld('description')?.value.trim()   || null });
+    if (esName) translations.push({ language: 'es', name: esName, description: fld('descriptionEs')?.value.trim() || null });
+
+    const costVal        = parseFloat(fld('cost')?.value);
+    const sellPriceVal   = parseFloat(fld('sellPrice')?.value);
+    const manualPriceVal = parseFloat(fld('manualPrice')?.value);
+    const weightVal      = parseFloat(fld('weight')?.value);
+    const multiplierVal  = parseFloat(fld('priceMultiplier')?.value);
+    const flatMarkupVal  = parseFloat(fld('flatMarkup')?.value);
+    const purityKaratVal = parseFloat(purityKarat?.value);
+    const quantityVal    = parseInt(fld('quantity')?.value, 10);
+    const locVal         = locationSelect?.value;
 
     return {
-      category:         form.category.value,
-      metal_id:         selectedMetal ? selectedMetal.id : null,
-      purity_karat:     selectedMetal && !isNaN(purityKaratVal) ? purityKaratVal : null,
-      weight_grams:     isNaN(weightVal)     ? null : weightVal,
-      price_multiplier: isNaN(multiplierVal) ? null : multiplierVal,
-      cost:             isNaN(costVal)       ? null : costVal,
-      sell_price:       isNaN(sellPriceVal)  ? null : sellPriceVal,
-      image_url:        form.imageUrl.value.trim() || null,
-      status:           form.status.value,
+      category:             fld('category')?.value || '',
+      metal_id:             selectedMetal ? selectedMetal.id : null,
+      purity_karat:         selectedMetal && !isNaN(purityKaratVal) ? purityKaratVal : null,
+      weight_grams:         isNaN(weightVal)      ? null : weightVal,
+      price_multiplier:     isNaN(multiplierVal)  ? null : multiplierVal,
+      flat_markup:          isNaN(flatMarkupVal)  ? null : flatMarkupVal,
+      quantity:             isNaN(quantityVal)    ? 1    : quantityVal,
+      purchase_location_id: (locVal && locVal !== '__new__') ? parseInt(locVal, 10) : null,
+      cost:                 isNaN(costVal)        ? null : costVal,
+      sell_price:           isNaN(sellPriceVal)   ? null : sellPriceVal,
+      price:                (() => {
+        if (!selectedMetal) return !isNaN(manualPriceVal) ? manualPriceVal : null;
+        // Pass frontend-calculated price as fallback if backend spot price is unavailable
+        const spot = spotPriceMap[selectedMetal.id];
+        if (!spot) return null;
+        const _w = weightVal, _k = purityKaratVal, _m = multiplierVal, _fm = flatMarkupVal || 0;
+        if (isNaN(_w) || isNaN(_k) || isNaN(_m)) return null;
+        const mr = (_w / GRAMS_PER_OZ) * spot * (_k / selectedMetal.purity_denominator);
+        return Math.round((mr * _m + _fm) * 100) / 100;
+      })(),
+      image_urls:           imageUrls,
+      status:               fld('status')?.value  || 'AVAILABLE',
       translations,
     };
   }
@@ -519,12 +1062,36 @@ async function loadAdminPage(token) {
   form.addEventListener('submit', async e => {
     e.preventDefault();
 
-    const missingName   = !form.productName.value.trim();
-    const missingKarat  = selectedMetal && !form.purityKarat.value;
-    const missingWeight = selectedMetal && !form.weight.value;
+    const missingName   = !document.getElementById('productName')?.value.trim();
+    const missingKarat  = selectedMetal && !purityKarat?.value;
+    const missingWeight = selectedMetal && !document.getElementById('weight')?.value;
     if (missingName || missingKarat || missingWeight) {
       showToast(t('toast.required'), 'error');
       return;
+    }
+
+    // Minimum price rule: listing price must be >= cost * 1.1
+    const _cost = parseFloat(document.getElementById('cost')?.value);
+    if (!isNaN(_cost) && _cost > 0) {
+      let _listing = null;
+      if (selectedMetal && spotPriceMap[selectedMetal.id]) {
+        const _w  = parseFloat(document.getElementById('weight')?.value);
+        const _k  = parseFloat(purityKarat?.value);
+        const _m  = parseFloat(document.getElementById('priceMultiplier')?.value);
+        const _fm = parseFloat(document.getElementById('flatMarkup')?.value) || 0;
+        if (!isNaN(_w) && !isNaN(_k) && !isNaN(_m)) {
+          const _spot = spotPriceMap[selectedMetal.id];
+          const _mr   = (_w / GRAMS_PER_OZ) * _spot * (_k / selectedMetal.purity_denominator);
+          _listing = _mr * _m + _fm;
+        }
+      }
+      if (_listing !== null && _listing < _cost * 1.1) {
+        showToast(
+          `Listing price ${formatPrice(_listing)} is below cost + 10% minimum (${formatPrice(_cost * 1.1)}).`,
+          'error'
+        );
+        return;
+      }
     }
 
     submitBtn.disabled = true;
@@ -555,23 +1122,39 @@ async function loadAdminPage(token) {
   function startEdit(product) {
     editingId = product.id;
 
-    form.productName.value    = product.name        || '';
-    form.productNameEs.value  = product.name_es     || '';
-    form.description.value    = product.description || '';
-    form.descriptionEs.value  = product.description_es || '';
-    form.category.value        = product.category;
-    form.weight.value          = product.weight_grams ?? '';
-    form.priceMultiplier.value = product.price_multiplier ?? '';
-    form.cost.value            = product.cost ?? '';
-    form.sellPrice.value       = product.sell_price ?? '';
-    form.imageUrl.value        = product.image_url || '';
-    form.status.value          = product.status;
+    document.getElementById('productName').value    = product.name           || '';
+    document.getElementById('productNameEs').value  = product.name_es        || '';
+    document.getElementById('description').value    = product.description    || '';
+    document.getElementById('descriptionEs').value  = product.description_es || '';
+    document.getElementById('category').value       = product.category;
+    document.getElementById('weight').value          = product.weight_grams    ?? '';
+    document.getElementById('priceMultiplier').value = product.price_multiplier ?? '';
+    document.getElementById('flatMarkup').value      = product.flat_markup      ?? 0;
+    document.getElementById('quantity').value        = product.quantity         ?? 1;
+    document.getElementById('cost').value            = product.cost             ?? '';
+    document.getElementById('sellPrice').value      = product.sell_price       ?? '';
+    document.getElementById('manualPrice').value    = product.price            ?? '';
+    // Status: only allow direct editing for single-unit items
+    const statusEl = document.getElementById('status');
+    if (statusEl) {
+      statusEl.value = product.status;
+      statusEl.disabled = product.quantity > 1;
+    }
     updateSellPriceVisibility();
+
+    // Restore purchase location selection
+    populateLocationSelect(product.purchase_location?.id ?? '');
+    if (newLocationGroup) newLocationGroup.style.display = 'none';
 
     // Restore metal picker selection
     const metalForItem = product.metal ? metals.find(m => m.id === product.metal.id) : null;
     selectMetal(metalForItem || null);
-    if (form.purityKarat) form.purityKarat.value = product.purity_karat ?? '';
+    if (purityKarat) purityKarat.value = product.purity_karat ?? '';
+
+    // Restore image gallery from existing item images
+    imageUrls = product.image_urls ? [...product.image_urls] : [];
+    renderGallery();
+    if (uploadStatus) uploadStatus.textContent = '';
 
     if (formTitle)    formTitle.textContent    = t('form.edit.title');
     if (formSubtitle) formSubtitle.textContent = t('form.subtitle');
@@ -601,9 +1184,21 @@ async function loadAdminPage(token) {
   /* -- Reset form -- */
   function resetForm() {
     editingId = null;
+    const statusEl = document.getElementById('status');
+    if (statusEl) statusEl.disabled = false;
     form.reset();
-    selectMetal(null);  // back to N/A
+    selectMetal(null);
     if (purityKarat) purityKarat.value = '';
+    if (pricePreview) pricePreview.style.display = 'none';
+    const _mpg = document.getElementById('manualPriceGroup');
+    if (_mpg) _mpg.style.display = '';
+    const _mp = document.getElementById('manualPrice');
+    if (_mp) _mp.value = '';
+    populateLocationSelect();
+    if (newLocationGroup) newLocationGroup.style.display = 'none';
+    imageUrls = [];
+    renderGallery();
+    if (uploadStatus) uploadStatus.textContent = '';
     if (formTitle)    formTitle.textContent    = t('form.add.title');
     if (formSubtitle) formSubtitle.textContent = t('form.subtitle');
     if (submitBtn)    submitBtn.textContent     = t('form.btn.add');
