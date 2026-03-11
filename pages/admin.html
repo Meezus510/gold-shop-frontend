@@ -11,6 +11,50 @@
   <link href="https://fonts.googleapis.com/css2?family=Volstead&display=swap" rel="stylesheet">
 
   <style>
+    /* ── Login modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+
+    .modal-box {
+      background: var(--white);
+      border-radius: var(--radius-md);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+
+    .modal-box h2 {
+      font-family: var(--font-serif);
+      font-size: 22px;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+
+    .modal-box p {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 24px;
+    }
+
+    .modal-box .form-group { margin-bottom: 16px; }
+
+    .login-error {
+      font-size: 13px;
+      color: #C62828;
+      min-height: 18px;
+      margin-bottom: 12px;
+    }
+
+    /* ── Admin layout ── */
     .admin-header-badge {
       display: inline-flex;
       align-items: center;
@@ -25,6 +69,21 @@
       padding: 4px 12px;
       border-radius: 999px;
     }
+
+    .btn-logout {
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      background: transparent;
+      border: 1px solid var(--border);
+      padding: 5px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: color .2s, border-color .2s;
+    }
+    .btn-logout:hover { color: #C62828; border-color: #C62828; }
 
     .stats-row {
       display: grid;
@@ -124,6 +183,32 @@
       cursor: default;
     }
 
+    /* ── Metal picker ── */
+    .metal-picker {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .metal-btn {
+      padding: 6px 18px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      color: var(--text-primary);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .metal-btn:hover { border-color: var(--gold-dark); color: var(--gold-dark); }
+    .metal-btn.active {
+      background: var(--gold-dark);
+      border-color: var(--gold-dark);
+      color: var(--white);
+    }
+
     @media (max-width: 640px) {
       .form-row { grid-template-columns: 1fr; }
       .inventory-table thead .hide-mobile { display: none; }
@@ -132,6 +217,28 @@
   </style>
 </head>
 <body>
+
+  <!-- ── Login modal ──────────────────────────────────────── -->
+  <div id="loginModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="modal-box">
+      <h2 id="loginTitle">Admin Login</h2>
+      <p>Enter your credentials to manage inventory.</p>
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="loginUsername">Username</label>
+          <input class="form-input" type="text" id="loginUsername" name="username"
+            autocomplete="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Password</label>
+          <input class="form-input" type="password" id="loginPassword" name="password"
+            autocomplete="current-password" required>
+        </div>
+        <p id="loginError" class="login-error" aria-live="polite"></p>
+        <button class="btn-primary" type="submit" style="width:100%;">Login</button>
+      </form>
+    </div>
+  </div>
 
   <!-- ── Header ──────────────────────────────────────────── -->
   <header class="site-header">
@@ -154,6 +261,7 @@
           </svg>
           <span data-i18n="admin.badge">Admin</span>
         </span>
+        <button id="logoutBtn" class="btn-logout" type="button">Logout</button>
         <a href="index.html" class="btn-admin" data-i18n="nav.viewStore">View Store</a>
         <div class="lang-toggle" role="group" data-i18n-aria="lang.label" aria-label="Language">
           <button class="lang-btn" data-lang="en">EN</button>
@@ -164,7 +272,7 @@
   </header>
 
   <!-- ── Page hero ────────────────────────────────────────── -->
-  <section class="page-hero" aria-label="Admin dashboard header">
+  <section id="pageHero" class="page-hero" aria-label="Admin dashboard header" style="display:none;">
     <div class="container">
       <h1 data-i18n="hero.admin.title">Inventory Dashboard</h1>
       <p data-i18n="hero.admin.subtitle">Add, edit, and manage your gold shop listings.</p>
@@ -177,9 +285,9 @@
   </section>
 
   <!-- ── Main ─────────────────────────────────────────────── -->
-  <main>
+  <main id="adminMain" style="display:none;">
     <div class="container">
-      <div class="admin-layout" style="padding-top:32px;">
+      <div id="adminContent" class="admin-layout" style="padding-top:32px;">
 
         <!-- ── Left: Add/Edit form ───────────────────────── -->
         <aside>
@@ -287,12 +395,40 @@
                 </select>
               </div>
 
-              <!-- Weight + Price -->
+              <!-- Metal selector -->
+              <div class="form-group">
+                <label class="form-label">
+                  <span data-i18n="form.label.metal">Metal</span>
+                </label>
+                <div id="metalPicker" class="metal-picker" role="group" aria-label="Select metal">
+                  <!-- Pills injected by app.js after fetching /metals -->
+                </div>
+                <input type="hidden" id="metalId" name="metalId" value="">
+              </div>
+
+              <!-- Karat / Purity (visible only when a metal is selected) -->
+              <div class="form-group" id="karatGroup" style="display:none;">
+                <label class="form-label" for="purityKarat">
+                  <span data-i18n="form.label.karat">Karat / Purity</span>
+                  <span class="required" aria-hidden="true">*</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="number"
+                  id="purityKarat"
+                  name="purityKarat"
+                  placeholder="e.g. 22"
+                  min="0.001"
+                  step="0.001"
+                >
+                <p class="form-hint" id="karatHint" data-i18n="form.hint.karat">e.g. 22 for 22k gold (out of 24)</p>
+              </div>
+
+              <!-- Weight + Price multiplier -->
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="weight">
                     <span data-i18n="form.label.weight">Weight (g)</span>
-                    <span class="required" aria-hidden="true">*</span>
                   </label>
                   <input
                     class="form-input"
@@ -303,59 +439,87 @@
                     placeholder="e.g. 25"
                     min="0.1"
                     step="0.1"
-                    required
                   >
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="price">
-                    <span data-i18n="form.label.price">Price (USD)</span>
-                    <span class="required" aria-hidden="true">*</span>
+                  <label class="form-label" for="priceMultiplier">
+                    <span data-i18n="form.label.multiplier">Price Multiplier</span>
                   </label>
                   <input
                     class="form-input"
                     type="number"
-                    id="price"
-                    name="price"
-                    data-i18n-placeholder="form.placeholder.price"
-                    placeholder="e.g. 2150"
-                    min="1"
-                    step="1"
+                    id="priceMultiplier"
+                    name="priceMultiplier"
+                    placeholder="e.g. 1.2"
+                    min="0.1"
+                    step="0.01"
+                    value="1.0"
                     required
                   >
+                  <p class="form-hint" data-i18n="form.hint.multiplier">Multiplied by gold spot price × weight</p>
                 </div>
               </div>
 
-              <!-- Status -->
-              <div class="form-group">
-                <label class="form-label" for="status">
-                  <span data-i18n="form.label.status">Status</span>
-                </label>
-                <select class="form-select" id="status" name="status">
-                  <option value="AVAILABLE"    data-i18n="status.available">Available</option>
-                  <option value="SALE_PENDING" data-i18n="status.pending">Sale Pending</option>
-                  <option value="SOLD"         data-i18n="status.sold">Sold</option>
-                </select>
-              </div>
-
-              <!-- Image upload -->
-              <div class="form-group">
-                <label class="form-label" for="imageInput">
-                  <span data-i18n="form.label.image">Product Image</span>
-                </label>
-                <div class="image-upload-area" id="uploadArea">
+              <!-- Cost + Status -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label class="form-label" for="cost">
+                    <span data-i18n="form.label.cost">My Cost (USD)</span>
+                  </label>
                   <input
-                    type="file"
-                    id="imageInput"
-                    name="imageInput"
-                    accept="image/*"
-                    aria-label="Upload product image"
+                    class="form-input"
+                    type="number"
+                    id="cost"
+                    name="cost"
+                    placeholder="e.g. 1200"
+                    min="0"
+                    step="0.01"
                   >
-                  <div class="upload-icon" aria-hidden="true">📷</div>
-                  <p class="upload-text" data-i18n="upload.text">Click or drag &amp; drop to upload</p>
-                  <p class="upload-hint" data-i18n="upload.hint">JPG, PNG, WEBP — max 5 MB</p>
+                  <p class="form-hint" data-i18n="form.hint.cost">What you paid — never shown publicly</p>
                 </div>
-                <img class="image-preview" id="imagePreview" alt="Preview of selected product image">
-                <p class="form-hint" data-i18n="upload.note">Image will be stored locally. For production, use a server upload.</p>
+                <div class="form-group">
+                  <label class="form-label" for="status">
+                    <span data-i18n="form.label.status">Status</span>
+                  </label>
+                  <select class="form-select" id="status" name="status">
+                    <option value="AVAILABLE"    data-i18n="status.available">Available</option>
+                    <option value="SALE_PENDING" data-i18n="status.pending">Sale Pending</option>
+                    <option value="SOLD"         data-i18n="status.sold">Sold</option>
+                  </select>
+                </div>
+              </div>
+
+              <!-- Sell Price (shown when SOLD or SALE_PENDING) -->
+              <div class="form-group" id="sellPriceGroup" style="display:none;">
+                <label class="form-label" for="sellPrice">
+                  <span data-i18n="form.label.sell_price">Final Sell Price (USD)</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="number"
+                  id="sellPrice"
+                  name="sellPrice"
+                  placeholder="e.g. 1850"
+                  min="0"
+                  step="0.01"
+                >
+                <p class="form-hint" data-i18n="form.hint.sell_price">Actual price the item sold for</p>
+              </div>
+
+              <!-- Image URL -->
+              <div class="form-group">
+                <label class="form-label" for="imageUrl">
+                  <span data-i18n="form.label.image">Image URL</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="url"
+                  id="imageUrl"
+                  name="imageUrl"
+                  placeholder="https://cdn.example.com/image.jpg"
+                  autocomplete="off"
+                >
+                <p class="form-hint" data-i18n="form.hint.image">Paste a hosted image URL (Cloudinary, Imgur, etc.)</p>
               </div>
 
               <!-- Actions -->
@@ -438,36 +602,12 @@
     <p style="margin-top:8px;">&copy; <span id="footerYear"></span> Anabel's Joyeria. <span data-i18n="footer.rights">All rights reserved.</span></p>
   </footer>
 
+  <script src="js/config.js"></script>
   <script src="js/i18n.js"></script>
+  <script src="js/api.js"></script>
   <script src="js/app.js"></script>
   <script>
     document.getElementById('footerYear').textContent = new Date().getFullYear();
-
-    function updateStats() {
-      const products = getAllProducts();
-      document.getElementById('statTotal').textContent     = products.length;
-      document.getElementById('statAvailable').textContent = products.filter(p => p.status === 'AVAILABLE').length;
-      document.getElementById('statPending').textContent   = products.filter(p => p.status === 'SALE_PENDING').length;
-      document.getElementById('statSold').textContent      = products.filter(p => p.status === 'SOLD').length;
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      updateStats();
-
-      const form  = document.getElementById('productForm');
-      const tbody = document.getElementById('tableBody');
-
-      if (form)  form.addEventListener('submit', () => setTimeout(updateStats, 50));
-      if (tbody) new MutationObserver(updateStats).observe(tbody, { childList: true });
-    });
-
-    /* Drag-over styling for upload area */
-    const area = document.getElementById('uploadArea');
-    if (area) {
-      area.addEventListener('dragover',  e => { e.preventDefault(); area.classList.add('drag-over'); });
-      area.addEventListener('dragleave', ()  => area.classList.remove('drag-over'));
-      area.addEventListener('drop',      e  => { e.preventDefault(); area.classList.remove('drag-over'); });
-    }
   </script>
 </body>
 </html>
