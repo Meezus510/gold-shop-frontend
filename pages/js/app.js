@@ -1290,9 +1290,9 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   if (page === 'index.html' || page === '' || page === '/') {
     await initCatalog();
-  } else if (page === 'item.html') {
+  } else if (page === 'item.html' || page === 'item') {
     await initDetail();
-  } else if (page === 'admin.html') {
+  } else if (page === 'admin.html' || page === 'admin') {
     await initAdmin();
   }
 

@@ -5,6 +5,17 @@
   bundle = false
   minify = false
 
+# Clean URL redirects
+[[redirects]]
+  from = "/admin"
+  to   = "/admin.html"
+  status = 200
+
+[[redirects]]
+  from = "/item"
+  to   = "/item.html"
+  status = 200
+
 # Security headers for all pages
 [[headers]]
   for = "/*"
