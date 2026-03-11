@@ -27,7 +27,15 @@ async function _apiFetch(path, options = {}) {
 
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
-    try { detail = (await res.json()).detail || detail; } catch (_) {}
+    try {
+      const body = await res.json();
+      if (typeof body.detail === 'string') {
+        detail = body.detail;
+      } else if (Array.isArray(body.detail)) {
+        // Pydantic validation errors — flatten to readable string
+        detail = body.detail.map(e => `${e.loc?.slice(1).join('.')}: ${e.msg}`).join(' | ');
+      }
+    } catch (_) {}
     throw new Error(detail);
   }
 
