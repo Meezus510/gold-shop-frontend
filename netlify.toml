@@ -1,6 +1,10 @@
 [build]
   publish = "pages"
 
+[build.processing.js]
+  bundle = false
+  minify = false
+
 # Security headers for all pages
 [[headers]]
   for = "/*"
