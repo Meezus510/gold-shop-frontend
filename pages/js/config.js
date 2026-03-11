@@ -19,7 +19,7 @@
 
     production: {
       hostnames: [],         // catch-all — used when no other env matches
-      API_BASE:      'https://your-app.onrender.com',   // ← update before deploying
+      API_BASE:      'https://gold-shop-backend-terp.onrender.com',
       WHATSAPP_NUMBER: '',   // e.g. '15551234567' (digits only, no + or spaces)
     },
   };
