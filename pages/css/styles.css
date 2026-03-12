@@ -485,7 +485,6 @@ button, input, select, textarea {
   gap: 3px;
 }
 
-.card-weight::before { content: '⚖'; font-size: 12px; }
 
 .card-price {
   font-size: 16px;
