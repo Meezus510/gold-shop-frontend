@@ -142,7 +142,7 @@ function createProductCard(product) {
       <h3 class="card-name">${escapeHTML(productName(product))}</h3>
       <p class="card-desc">${escapeHTML(productDesc(product))}</p>
       <div class="card-meta">
-        <span class="card-weight">${product.weight_grams}g${formatPurity(product) ? ` · ${escapeHTML(formatPurity(product))}` : ''}</span>
+        <span class="card-weight">${formatPurity(product) ? escapeHTML(formatPurity(product)) : ''}</span>
         <span class="card-price">${formatPrice(product.price)}</span>
       </div>
     </div>
@@ -204,9 +204,8 @@ async function initCatalog() {
     else if (sortBy === 'price_desc')
       result.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
     else if (sortBy === 'weight_asc')
-      result.sort((a, b) => (a.weight_grams ?? Infinity) - (b.weight_grams ?? Infinity));
+
     else if (sortBy === 'weight_desc')
-      result.sort((a, b) => (b.weight_grams ?? -Infinity) - (a.weight_grams ?? -Infinity));
 
     grid.innerHTML = '';
     if (result.length === 0) {
@@ -364,7 +363,7 @@ async function initDetail() {
   setTextContent('detailName',     productName(product));
   setTextContent('detailCategory', categoryLabel(product.category));
   setTextContent('detailDesc',     productDesc(product));
-  setTextContent('detailWeight',   product.weight_grams);
+  // weight intentionally not shown publicly
   setTextContent('detailPrice',    formatPrice(product.price));
 
   // Inject purity spec if available
