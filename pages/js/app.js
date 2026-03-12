@@ -203,10 +203,6 @@ async function initCatalog() {
       result.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity));
     else if (sortBy === 'price_desc')
       result.sort((a, b) => (b.price ?? -Infinity) - (a.price ?? -Infinity));
-    else if (sortBy === 'weight_asc')
-
-    else if (sortBy === 'weight_desc')
-
     grid.innerHTML = '';
     if (result.length === 0) {
       grid.innerHTML = `<div class="grid-empty"><div class="empty-icon">🔍</div><p>${t('grid.empty')}</p></div>`;
