@@ -952,7 +952,32 @@ button, input, select, textarea {
 .table-name { font-weight: 500; color: var(--text-primary); }
 .table-sub  { font-size: 11px; color: var(--text-muted); margin-top: 1px; }
 
-.table-actions { display: flex; gap: 6px; }
+.table-actions { display: flex; gap: 6px; align-items: center; }
+
+.btn-visibility {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  border: 1px solid transparent;
+}
+.btn-visible {
+  background: #E8F5E9;
+  color: #2E7D32;
+  border-color: #A5D6A7;
+}
+.btn-visible:hover  { background: #C8E6C9; }
+.btn-hidden {
+  background: var(--bg);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+.btn-hidden:hover   { background: var(--border); color: var(--text-secondary); }
+.btn-visibility:disabled { opacity: .5; cursor: not-allowed; }
 
 .btn-edit,
 .btn-delete {

@@ -195,6 +195,38 @@ async function apiGetSyncStatus(token) {
   return _apiFetch('/metals/price-sync-status', { headers: _authHeaders(token) });
 }
 
+/* ── Batch upload ──────────────────────────────────────────── */
+
+async function apiParseBatchImage(token, file) {
+  const form = new FormData();
+  form.append('file', file);
+  return _apiFetch('/admin/parse-batch-image', {
+    method:  'POST',
+    headers: { 'Authorization': `Bearer ${token}` },
+    body:    form,
+  });
+}
+
+async function apiCreateBatch(token, payload) {
+  const data = await _apiFetch('/admin/items/batch', {
+    method:  'POST',
+    headers: _authHeaders(token),
+    body:    JSON.stringify(payload),
+  });
+  return data.map(_normalizeAdmin);
+}
+
+/* ── Visibility toggle ─────────────────────────────────────── */
+
+async function apiToggleVisibility(token, id, isVisible) {
+  const data = await _apiFetch(`/admin/items/${id}/visibility`, {
+    method:  'PATCH',
+    headers: _authHeaders(token),
+    body:    JSON.stringify({ is_visible: isVisible }),
+  });
+  return _normalizeAdmin(data);
+}
+
 /* ── Image upload ──────────────────────────────────────────── */
 
 /**
