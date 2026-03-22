@@ -16,6 +16,11 @@
   to   = "/item.html"
   status = 200
 
+[[redirects]]
+  from = "/admin-batch"
+  to   = "/admin-batch.html"
+  status = 200
+
 # Security headers for all pages
 [[headers]]
   for = "/*"
