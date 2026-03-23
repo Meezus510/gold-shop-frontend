@@ -652,6 +652,7 @@ async function loadAdminPage(token) {
   const pricePreview        = document.getElementById('pricePreview');
   const previewMarketRate   = document.getElementById('previewMarketRate');
   const previewListingPrice = document.getElementById('previewListingPrice');
+  const previewLoanPrice    = document.getElementById('previewLoanPrice');
   const previewMinRow       = document.getElementById('previewMinRow');
   const previewMin          = document.getElementById('previewMin');
   const previewWarning      = document.getElementById('previewWarning');
@@ -666,8 +667,8 @@ async function loadAdminPage(token) {
     const spotPrice   = spotPriceMap[selectedMetal.id];
     const weightGrams = parseFloat(document.getElementById('weight')?.value);
     const karat       = parseFloat(purityKarat?.value);
-    const multiplier  = parseFloat(document.getElementById('priceMultiplier')?.value);
-    const flatMarkup  = parseFloat(document.getElementById('flatMarkup')?.value) || 0;
+    const markupFlat  = parseFloat(document.getElementById('markupFlat')?.value) || 0;
+    const markupLoan  = parseFloat(document.getElementById('markupLoan')?.value) || 0;
     const denom       = selectedMetal.purity_denominator;
 
     // Spot price not yet available
@@ -678,25 +679,29 @@ async function loadAdminPage(token) {
           : spotPricesFailed            ? 'Spot price unavailable'
           :                               '—';
       }
+      if (previewLoanPrice) previewLoanPrice.textContent = '—';
       return;
     }
 
-    if (isNaN(weightGrams) || isNaN(karat) || isNaN(multiplier)) {
+    if (isNaN(weightGrams) || isNaN(karat)) {
       if (previewMarketRate)   previewMarketRate.textContent   = '—';
       if (previewListingPrice) previewListingPrice.textContent = '—';
+      if (previewLoanPrice)    previewLoanPrice.textContent    = '—';
       return;
     }
 
-    const marketRate   = (weightGrams / GRAMS_PER_OZ) * spotPrice * (karat / denom);
-    const listingPrice = marketRate * multiplier + flatMarkup;
+    const marketRate  = (weightGrams / GRAMS_PER_OZ) * spotPrice * (karat / denom);
+    const flatPrice   = marketRate + markupFlat;
+    const loanPrice   = marketRate + markupLoan;
 
     if (previewMarketRate)   previewMarketRate.textContent   = formatPrice(marketRate);
-    if (previewListingPrice) previewListingPrice.textContent = formatPrice(listingPrice);
+    if (previewListingPrice) previewListingPrice.textContent = formatPrice(flatPrice);
+    if (previewLoanPrice)    previewLoanPrice.textContent    = formatPrice(loanPrice);
 
-    // Minimum price rule: listing must be >= cost * 1.1
+    // Minimum price rule: flat listing must be >= cost * 1.1
     const cost    = parseFloat(document.getElementById('cost')?.value);
     const minPrice = (!isNaN(cost) && cost > 0) ? cost * 1.1 : null;
-    const belowMin = minPrice !== null && listingPrice < minPrice;
+    const belowMin = minPrice !== null && flatPrice < minPrice;
 
     if (previewMinRow)  previewMinRow.style.display  = minPrice !== null ? '' : 'none';
     if (previewMin)     previewMin.textContent        = minPrice !== null ? formatPrice(minPrice) : '—';
@@ -727,7 +732,7 @@ async function loadAdminPage(token) {
   }
 
   // Wire live price preview on input changes
-  ['weight', 'priceMultiplier', 'flatMarkup', 'cost'].forEach(id => {
+  ['weight', 'markupFlat', 'markupLoan', 'cost'].forEach(id => {
     document.getElementById(id)?.addEventListener('input', updatePricePreview);
   });
   purityKarat?.addEventListener('input', updatePricePreview);
@@ -1040,8 +1045,8 @@ async function loadAdminPage(token) {
     const sellPriceVal   = parseFloat(fld('sellPrice')?.value);
     const manualPriceVal = parseFloat(fld('manualPrice')?.value);
     const weightVal      = parseFloat(fld('weight')?.value);
-    const multiplierVal  = parseFloat(fld('priceMultiplier')?.value);
-    const flatMarkupVal  = parseFloat(fld('flatMarkup')?.value);
+    const markupFlatVal  = parseFloat(fld('markupFlat')?.value);
+    const markupLoanVal  = parseFloat(fld('markupLoan')?.value);
     const purityKaratVal = parseFloat(purityKarat?.value);
     const quantityVal    = parseInt(fld('quantity')?.value, 10);
     const locVal         = locationSelect?.value;
@@ -1051,24 +1056,16 @@ async function loadAdminPage(token) {
       metal_id:             selectedMetal ? selectedMetal.id : null,
       purity_karat:         selectedMetal && !isNaN(purityKaratVal) ? purityKaratVal : null,
       weight_grams:         isNaN(weightVal)      ? null : weightVal,
-      price_multiplier:     isNaN(multiplierVal)  ? null : multiplierVal,
-      flat_markup:          isNaN(flatMarkupVal)  ? null : flatMarkupVal,
+      markup_flat:          selectedMetal && !isNaN(markupFlatVal)  ? markupFlatVal  : null,
+      markup_loan:          selectedMetal && !isNaN(markupLoanVal)  ? markupLoanVal  : null,
+      listed_price_flat:    !selectedMetal && !isNaN(manualPriceVal) ? manualPriceVal : null,
       quantity:             isNaN(quantityVal)    ? 1    : quantityVal,
       purchase_location_id: (locVal && locVal !== '__new__') ? parseInt(locVal, 10) : null,
       cost:                 isNaN(costVal)        ? null : costVal,
       sell_price:           isNaN(sellPriceVal)   ? null : sellPriceVal,
-      price:                (() => {
-        if (!selectedMetal) return !isNaN(manualPriceVal) ? manualPriceVal : null;
-        // Pass frontend-calculated price as fallback if backend spot price is unavailable
-        const spot = spotPriceMap[selectedMetal.id];
-        if (!spot) return null;
-        const _w = weightVal, _k = purityKaratVal, _m = multiplierVal, _fm = flatMarkupVal || 0;
-        if (isNaN(_w) || isNaN(_k) || isNaN(_m)) return null;
-        const mr = (_w / GRAMS_PER_OZ) * spot * (_k / selectedMetal.purity_denominator);
-        return Math.round((mr * _m + _fm) * 100) / 100;
-      })(),
       image_urls:           imageUrls,
       status:               fld('status')?.value  || 'AVAILABLE',
+      is_visible:           false,
       translations,
     };
   }
@@ -1142,13 +1139,13 @@ async function loadAdminPage(token) {
     document.getElementById('description').value    = product.description    || '';
     document.getElementById('descriptionEs').value  = product.description_es || '';
     document.getElementById('category').value       = product.category;
-    document.getElementById('weight').value          = product.weight_grams    ?? '';
-    document.getElementById('priceMultiplier').value = product.price_multiplier ?? '';
-    document.getElementById('flatMarkup').value      = product.flat_markup      ?? 0;
-    document.getElementById('quantity').value        = product.quantity         ?? 1;
-    document.getElementById('cost').value            = product.cost             ?? '';
-    document.getElementById('sellPrice').value      = product.sell_price       ?? '';
-    document.getElementById('manualPrice').value    = product.price            ?? '';
+    document.getElementById('weight').value        = product.weight_grams   ?? '';
+    document.getElementById('markupFlat').value    = product.markup_flat    ?? 0;
+    document.getElementById('markupLoan').value    = product.markup_loan    ?? 0;
+    document.getElementById('quantity').value      = product.quantity       ?? 1;
+    document.getElementById('cost').value          = product.cost           ?? '';
+    document.getElementById('sellPrice').value     = product.sell_price     ?? '';
+    document.getElementById('manualPrice').value   = product.listed_price_flat ?? '';
     // Status: only allow direct editing for single-unit items
     const statusEl = document.getElementById('status');
     if (statusEl) {

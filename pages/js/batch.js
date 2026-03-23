@@ -12,8 +12,9 @@ let _token        = null;
 let _metals       = [];
 let _rows         = [];          // enriched row objects from Claude
 let _sourceImgUrl = null;        // Cloudinary URL of the uploaded sheet photo
+let _batchType    = 'metal';     // 'metal' | 'na'
 
-const CATEGORIES = ['ring','necklace','bracelet','earrings','pendant','chain','bangle','brooch','set','other'];
+const CATEGORIES = ['ring','necklace','bracelet','earrings','broqueles','pendant','chain','bangle','brooch','set','other'];
 
 /* ── Helpers ───────────────────────────────────────────────── */
 
@@ -36,6 +37,43 @@ function showToast(msg, type = 'success') {
 
 function getToken() { return sessionStorage.getItem('goldshop_token'); }
 
+/* ── Batch type ─────────────────────────────────────────────── */
+
+function setBatchType(type) {
+  _batchType = type;
+  document.getElementById('typeMetal').classList.toggle('active', type === 'metal');
+  document.getElementById('typeNA').classList.toggle('active',    type === 'na');
+  document.getElementById('metalFields').style.display = type === 'metal' ? '' : 'none';
+}
+
+/* ── Purity field ───────────────────────────────────────────── */
+
+function updatePurityField(metalId) {
+  const metal  = _metals.find(m => m.id === metalId);
+  const input  = document.getElementById('batchPurity');
+  const label  = document.getElementById('batchPurityLabel');
+
+  if (!metal) return;
+
+  const isKarat = metal.purity_denominator === 24;
+
+  if (isKarat) {
+    label.textContent  = 'Purity (karat)';
+    input.min          = '1';
+    input.max          = '24';
+    input.step         = '0.5';
+    input.placeholder  = 'e.g. 14';
+    if (!input.dataset.userEdited) input.value = '14';
+  } else {
+    label.textContent  = 'Purity (e.g. 925, 950, 999)';
+    input.min          = '1';
+    input.max          = '1000';
+    input.step         = '1';
+    input.placeholder  = 'e.g. 925';
+    if (!input.dataset.userEdited) input.value = '925';
+  }
+}
+
 /* ── Steps ─────────────────────────────────────────────────── */
 
 function showStep(n) {
@@ -50,6 +88,23 @@ function showStep(n) {
 /* ── Step 2: review table ───────────────────────────────────── */
 
 function renderTable() {
+  // Swap table headers based on batch type
+  const thead = document.getElementById('reviewHead');
+  if (thead) {
+    if (_batchType === 'na') {
+      thead.innerHTML = `<tr>
+        <th>#</th><th>Name (ES)</th><th>Name (EN)</th><th>Category</th>
+        <th>Cost ($)</th><th>Price ($)</th><th>Status</th><th>Sell ($)</th><th></th>
+      </tr>`;
+    } else {
+      thead.innerHTML = `<tr>
+        <th>#</th><th>Name (ES)</th><th>Name (EN)</th><th>Category</th>
+        <th>Cost ($)</th><th>Weight (g)</th><th>Flat ($)</th><th>Loan ($)</th>
+        <th>Status</th><th>Sell ($)</th><th></th>
+      </tr>`;
+    }
+  }
+
   const tbody = document.getElementById('reviewBody');
   tbody.innerHTML = _rows.map((row, i) => renderRow(row, i)).join('');
 
@@ -72,6 +127,39 @@ function renderRow(row, i) {
     `<option value="${c}" ${row.category === c ? 'selected' : ''}>${c}</option>`
   ).join('');
 
+  const statusCell = `
+    <select data-field="status" class="tbl-input tbl-status ${isSold ? 'status-sold' : 'status-available'}">
+      <option value="AVAILABLE" ${!isSold ? 'selected' : ''}>Available</option>
+      <option value="SOLD"      ${ isSold ? 'selected' : ''}>Sold</option>
+    </select>`;
+
+  const sellCell = `<td id="sell-cell-${i}">
+    ${isSold
+      ? `<input data-field="sell_price" type="number" step="0.01" min="0"
+           value="${esc(row.sell_price ?? row.listed_price_flat ?? '')}"
+           class="tbl-input tbl-num-input" placeholder="Sell $">`
+      : `<span class="tbl-na">—</span>`}
+  </td>`;
+
+  if (_batchType === 'na') {
+    return `
+      <tr data-idx="${i}">
+        <td class="tbl-num">${i + 1}</td>
+        <td><input data-field="name_es" value="${esc(row.name_es)}" class="tbl-input" style="min-width:140px"></td>
+        <td><input data-field="name_en" value="${esc(row.name_en)}" class="tbl-input" style="min-width:140px"></td>
+        <td>
+          <select data-field="category" class="tbl-input tbl-select">${catOptions}</select>
+        </td>
+        <td><input data-field="cost" type="number" step="0.01" min="0" value="${esc(row.cost ?? '')}" class="tbl-input tbl-num-input"></td>
+        <td><input data-field="listed_price_flat" type="number" step="0.01" min="0" value="${esc(row.listed_price_flat ?? '')}" class="tbl-input tbl-num-input"></td>
+        <td>${statusCell}</td>
+        ${sellCell}
+        <td>
+          <button class="tbl-delete-btn" onclick="deleteRow(${i})" title="Remove row" aria-label="Remove row ${i + 1}">✕</button>
+        </td>
+      </tr>`;
+  }
+
   return `
     <tr data-idx="${i}">
       <td class="tbl-num">${i + 1}</td>
@@ -84,19 +172,8 @@ function renderRow(row, i) {
       <td><input data-field="weight_grams" type="number" step="0.01" min="0" value="${esc(row.weight_grams ?? '')}" class="tbl-input tbl-num-input"></td>
       <td><input data-field="listed_price_flat" type="number" step="0.01" min="0" value="${esc(row.listed_price_flat ?? '')}" class="tbl-input tbl-num-input"></td>
       <td><input data-field="listed_price_loan" type="number" step="0.01" min="0" value="${esc(row.listed_price_loan ?? '')}" class="tbl-input tbl-num-input"></td>
-      <td>
-        <select data-field="status" class="tbl-input tbl-status ${isSold ? 'status-sold' : 'status-available'}">
-          <option value="AVAILABLE" ${!isSold ? 'selected' : ''}>Available</option>
-          <option value="SOLD"      ${ isSold ? 'selected' : ''}>Sold</option>
-        </select>
-      </td>
-      <td id="sell-cell-${i}">
-        ${isSold
-          ? `<input data-field="sell_price" type="number" step="0.01" min="0"
-               value="${esc(row.sell_price ?? row.listed_price_flat ?? '')}"
-               class="tbl-input tbl-num-input" placeholder="Sell $">`
-          : `<span class="tbl-na">—</span>`}
-      </td>
+      <td>${statusCell}</td>
+      ${sellCell}
       <td>
         <button class="tbl-delete-btn" onclick="deleteRow(${i})" title="Remove row" aria-label="Remove row ${i + 1}">✕</button>
       </td>
@@ -137,21 +214,28 @@ function deleteRow(i) {
 async function handleParse(e) {
   e.preventDefault();
 
-  const metalId = +document.getElementById('batchMetal').value;
-  const purity  = +document.getElementById('batchPurity').value;
-  const file    = document.getElementById('batchFile').files[0];
-  const btn     = document.getElementById('parseBtn');
+  const file = document.getElementById('batchFile').files[0];
+  const btn  = document.getElementById('parseBtn');
 
-  if (!metalId || !purity || !file) {
-    showToast('Please select metal, purity, and an image.', 'error');
-    return;
+  if (_batchType === 'metal') {
+    const metalId = +document.getElementById('batchMetal').value;
+    const purity  = +document.getElementById('batchPurity').value;
+    if (!metalId || !purity || !file) {
+      showToast('Please select metal, purity, and an image.', 'error');
+      return;
+    }
+  } else {
+    if (!file) {
+      showToast('Please select an image.', 'error');
+      return;
+    }
   }
 
   btn.disabled    = true;
   btn.textContent = 'Parsing image…';
 
   try {
-    const result = await apiParseBatchImage(_token, file);
+    const result = await apiParseBatchImage(_token, file, _batchType);
 
     _rows         = result.rows.map(row => ({ status: 'AVAILABLE', ...row }));
     _sourceImgUrl = result.source_image_url;
@@ -190,8 +274,6 @@ async function handleParse(e) {
 
 async function handleSave() {
   const btn      = document.getElementById('saveBtn');
-  const metalId  = +document.getElementById('step2').dataset.metalId;
-  const purity   = +document.getElementById('step2').dataset.purity;
   const date     = document.getElementById('batchDate').value     || null;
   const location = document.getElementById('batchLocation').value || null;
 
@@ -212,11 +294,12 @@ async function handleSave() {
   btn.textContent = 'Saving…';
 
   try {
-    const created = await apiCreateBatch(_token, {
-      metal_id:     metalId,
-      purity_karat: purity,
-      rows,
-    });
+    const payload = { batch_type: _batchType, rows };
+    if (_batchType === 'metal') {
+      payload.metal_id     = +document.getElementById('step2').dataset.metalId;
+      payload.purity_karat = +document.getElementById('step2').dataset.purity;
+    }
+    const created = await apiCreateBatch(_token, payload);
 
     const available = created.filter(i => i.status === 'AVAILABLE').length;
     const sold      = created.filter(i => i.status === 'SOLD').length;
@@ -246,11 +329,12 @@ async function handleSave() {
 function resetBatch() {
   _rows = [];
   _sourceImgUrl = null;
-  document.getElementById('batchFile').value           = '';
-  document.getElementById('fileLabel').textContent     = 'Choose file or drag & drop';
+  document.getElementById('batchFile').value             = '';
+  document.getElementById('fileLabel').textContent       = 'Choose file or drag & drop';
   document.getElementById('sourcePreview').style.display = 'none';
-  document.getElementById('saveBtnRow').style.display  = '';
-  document.getElementById('saveResult').innerHTML      = '';
+  document.getElementById('saveBtnRow').style.display    = '';
+  document.getElementById('saveResult').innerHTML        = '';
+  setBatchType('metal');
   showStep(1);
 }
 
@@ -294,12 +378,24 @@ async function initBatch() {
       opt.textContent = m.name;
       sel.appendChild(opt);
     });
+    sel.addEventListener('change', () => {
+      document.getElementById('batchPurity').dataset.userEdited = '';
+      updatePurityField(+sel.value);
+    });
   } catch (_) { /* non-fatal */ }
 
   document.getElementById('logoutBtn').addEventListener('click', () => {
     sessionStorage.removeItem('goldshop_token');
     window.location.href = 'admin.html';
   });
+
+  document.getElementById('batchPurity').addEventListener('input', function () {
+    this.dataset.userEdited = '1';
+  });
+
+  // Batch type toggle
+  document.getElementById('typeMetal').addEventListener('click', () => setBatchType('metal'));
+  document.getElementById('typeNA').addEventListener('click',    () => setBatchType('na'));
 
   document.getElementById('parseForm').addEventListener('submit', handleParse);
   document.getElementById('saveBtn').addEventListener('click', handleSave);

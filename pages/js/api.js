@@ -197,9 +197,10 @@ async function apiGetSyncStatus(token) {
 
 /* ── Batch upload ──────────────────────────────────────────── */
 
-async function apiParseBatchImage(token, file) {
+async function apiParseBatchImage(token, file, batchType = 'metal') {
   const form = new FormData();
   form.append('file', file);
+  form.append('batch_type', batchType);
   return _apiFetch('/admin/parse-batch-image', {
     method:  'POST',
     headers: { 'Authorization': `Bearer ${token}` },
