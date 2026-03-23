@@ -681,13 +681,19 @@
                   <span data-i18n="form.label.category">Category</span>
                 </label>
                 <select class="form-select" id="category" name="category">
-                  <option value="necklace" data-i18n="cat.necklace">Necklace</option>
-                  <option value="bangle"   data-i18n="cat.bangle">Bangle</option>
-                  <option value="earring"  data-i18n="cat.earring">Earring</option>
-                  <option value="ring"     data-i18n="cat.ring">Ring</option>
-                  <option value="bracelet" data-i18n="cat.bracelet">Bracelet</option>
-                  <option value="coin"     data-i18n="cat.coin">Coin / Bar</option>
-                  <option value="other"    data-i18n="cat.other">Other</option>
+                  <option value="necklace"  data-i18n="cat.necklace">Necklace</option>
+                  <option value="bangle"    data-i18n="cat.bangle">Bangle</option>
+                  <option value="earring"   data-i18n="cat.earring">Earring</option>
+                  <option value="earrings"  data-i18n="cat.earrings">Earrings</option>
+                  <option value="broqueles">Broqueles</option>
+                  <option value="ring"      data-i18n="cat.ring">Ring</option>
+                  <option value="bracelet"  data-i18n="cat.bracelet">Bracelet</option>
+                  <option value="pendant"   data-i18n="cat.pendant">Pendant</option>
+                  <option value="chain"     data-i18n="cat.chain">Chain</option>
+                  <option value="brooch"    data-i18n="cat.brooch">Brooch</option>
+                  <option value="set"       data-i18n="cat.set">Set</option>
+                  <option value="coin"      data-i18n="cat.coin">Coin / Bar</option>
+                  <option value="other"     data-i18n="cat.other">Other</option>
                 </select>
               </div>
 
@@ -720,7 +726,7 @@
                 <p class="form-hint" id="karatHint" data-i18n="form.hint.karat">e.g. 22 for 22k gold (out of 24)</p>
               </div>
 
-              <!-- Weight + Price multiplier -->
+              <!-- Weight + Flat Markup -->
               <div class="form-row">
                 <div class="form-group">
                   <label class="form-label" for="weight">
@@ -738,40 +744,35 @@
                   >
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="priceMultiplier">
-                    <span data-i18n="form.label.multiplier">Price Multiplier</span>
-                  </label>
+                  <label class="form-label" for="markupFlat">Flat Sale Markup ($)</label>
                   <input
                     class="form-input"
                     type="number"
-                    id="priceMultiplier"
-                    name="priceMultiplier"
-                    placeholder="e.g. 1.2"
-                    min="0.1"
+                    id="markupFlat"
+                    name="markupFlat"
+                    placeholder="e.g. 80"
+                    min="0"
                     step="0.01"
-                    value="1.0"
-                    required
+                    value="0"
                   >
-                  <p class="form-hint" data-i18n="form.hint.multiplier">Multiplied by gold spot price × weight</p>
+                  <p class="form-hint">$ added above metal value for flat sale price</p>
                 </div>
               </div>
 
-              <!-- Flat Markup -->
+              <!-- Loan Markup -->
               <div class="form-group">
-                <label class="form-label" for="flatMarkup">
-                  <span data-i18n="form.label.flat_markup">Flat Markup ($)</span>
-                </label>
+                <label class="form-label" for="markupLoan">Loan Markup ($)</label>
                 <input
                   class="form-input"
                   type="number"
-                  id="flatMarkup"
-                  name="flatMarkup"
+                  id="markupLoan"
+                  name="markupLoan"
                   placeholder="e.g. 50"
                   min="0"
                   step="0.01"
                   value="0"
                 >
-                <p class="form-hint" data-i18n="form.hint.flat_markup">Fixed dollar amount added on top of metal value × multiplier</p>
+                <p class="form-hint">$ added above metal value for loan price</p>
               </div>
 
               <!-- Manual price (N/A — no metal selected) -->
@@ -795,19 +796,22 @@
               <div id="pricePreview" class="price-preview" style="display:none;" aria-live="polite">
                 <div class="price-preview-title" data-i18n="preview.title">Price Preview</div>
                 <div class="price-preview-row">
-                  <span class="price-preview-label" data-i18n="preview.market_rate">Metal value</span>
+                  <span class="price-preview-label">Metal value</span>
                   <span class="price-preview-value" id="previewMarketRate">—</span>
                 </div>
                 <div class="price-preview-row">
-                  <span class="price-preview-label" data-i18n="preview.listing_price">Listing price</span>
+                  <span class="price-preview-label">Flat sale price</span>
                   <span class="price-preview-value accent" id="previewListingPrice">—</span>
                 </div>
+                <div class="price-preview-row">
+                  <span class="price-preview-label">Loan price</span>
+                  <span class="price-preview-value accent" id="previewLoanPrice">—</span>
+                </div>
                 <div class="price-preview-row" id="previewMinRow" style="display:none;">
-                  <span class="price-preview-label" data-i18n="preview.min_price">Minimum (cost + 10%)</span>
+                  <span class="price-preview-label">Minimum (cost + 10%)</span>
                   <span class="price-preview-value" id="previewMin">—</span>
                 </div>
-                <p class="price-preview-warning" id="previewWarning" style="display:none;"
-                  data-i18n="preview.below_min">Below minimum — raise multiplier or markup</p>
+                <p class="price-preview-warning" id="previewWarning" style="display:none;">Below minimum — raise markup</p>
               </div>
 
               <!-- Cost + Status -->

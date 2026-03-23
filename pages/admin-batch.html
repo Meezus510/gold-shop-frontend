@@ -47,6 +47,24 @@
       flex: 1; height: 2px; background: var(--border); margin: 0 10px; min-width: 32px;
     }
 
+    /* ── Batch type toggle ── */
+    .btn-type-toggle {
+      padding: 8px 18px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--white);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: border-color .2s, color .2s, background .2s;
+    }
+    .btn-type-toggle.active {
+      border-color: var(--gold);
+      background: var(--gold-pale);
+      color: var(--gold-dark);
+    }
+
     /* ── Upload zone ── */
     .drop-zone {
       border: 2px dashed var(--gold-border);
@@ -347,19 +365,34 @@
         <form id="parseForm" novalidate>
           <div class="setup-card">
             <h2>Purchase Sheet Details</h2>
-            <p class="subtitle">Select the metal and purity for this batch, then upload a photo of the purchase sheet.</p>
+            <p class="subtitle">Choose the batch type, then upload a photo of the purchase sheet.</p>
 
-            <div class="setup-row">
-              <div class="form-group">
-                <label class="form-label" for="batchMetal">Metal</label>
-                <select id="batchMetal" class="form-select" required>
-                  <option value="">Select metal…</option>
-                </select>
+            <!-- Batch type toggle -->
+            <div class="form-group" style="margin-bottom:20px;">
+              <label class="form-label">Batch Type</label>
+              <div style="display:flex;gap:10px;">
+                <button type="button" id="typeMetal" class="btn-type-toggle active">
+                  ⚙ Metal Items
+                </button>
+                <button type="button" id="typeNA" class="btn-type-toggle">
+                  📦 Non-Metal (N/A)
+                </button>
               </div>
-              <div class="form-group">
-                <label class="form-label" for="batchPurity">Purity (karat)</label>
-                <input id="batchPurity" class="form-input" type="number" min="1" max="24"
-                  step="0.5" placeholder="e.g. 14" value="14" required>
+            </div>
+
+            <div id="metalFields">
+              <div class="setup-row">
+                <div class="form-group">
+                  <label class="form-label" for="batchMetal">Metal</label>
+                  <select id="batchMetal" class="form-select">
+                    <option value="">Select metal…</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label class="form-label" for="batchPurity" id="batchPurityLabel">Purity (karat)</label>
+                  <input id="batchPurity" class="form-input" type="number" min="1" max="24"
+                    step="0.5" placeholder="e.g. 14" value="14">
+                </div>
               </div>
             </div>
 
@@ -420,7 +453,7 @@
         <!-- Scrollable table -->
         <div class="table-scroll">
           <table class="review-table" aria-label="Batch review table">
-            <thead>
+            <thead id="reviewHead">
               <tr>
                 <th>#</th>
                 <th>Name (ES)</th>
