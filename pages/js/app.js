@@ -733,9 +733,20 @@ async function loadAdminPage(token) {
 
   // Wire live price preview on input changes
   ['weight', 'markupFlat', 'markupLoan', 'cost'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', updatePricePreview);
+    const field = document.getElementById(id);
+    field?.addEventListener('input', () => {
+      clearFieldError(field);
+      updatePricePreview();
+    });
   });
-  purityKarat?.addEventListener('input', updatePricePreview);
+  purityKarat?.addEventListener('input', () => {
+    clearFieldError(purityKarat);
+    updatePricePreview();
+  });
+  ['manualPrice', 'sellPrice'].forEach(id => {
+    const field = document.getElementById(id);
+    field?.addEventListener('input', () => clearFieldError(field));
+  });
 
   /* -- Logout -- */
   if (logoutBtn) {
@@ -937,9 +948,69 @@ async function loadAdminPage(token) {
   const imageFileInput = document.getElementById('imageFile');
   const imageGallery   = document.getElementById('imageGallery');
   const uploadStatus   = document.getElementById('uploadStatus');
+  const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+  const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
   // In-memory ordered list of image URLs for the current form session
   let imageUrls = [];
+
+  function clearFieldError(field) {
+    field?.classList.remove('input-error');
+  }
+
+  function setFieldError(field) {
+    field?.classList.add('input-error');
+  }
+
+  function validateImageFile(file) {
+    const hasValidMime = ALLOWED_IMAGE_TYPES.has(file.type);
+    const hasValidExt = /\.(jpe?g|png|webp)$/i.test(file.name || '');
+    if (!hasValidMime && !(file.type === '' && hasValidExt)) {
+      return 'Unsupported file type. Use JPG, PNG, or WEBP.';
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      return 'Image is too large. Max 10 MB.';
+    }
+    return null;
+  }
+
+  function getNumericFieldValue(field) {
+    if (!field) return null;
+    const raw = field.value.trim();
+    if (raw === '') return null;
+    const value = parseFloat(raw);
+    return Number.isNaN(value) ? null : value;
+  }
+
+  function validateNonNegativeFields() {
+    const checks = [
+      { id: 'cost', label: 'Cost' },
+      { id: 'weight', label: 'Weight' },
+      { id: 'markupFlat', label: 'Flat sale markup' },
+      { id: 'markupLoan', label: 'Loan markup' },
+      { id: 'manualPrice', label: 'Manual price', when: () => !selectedMetal },
+      { id: 'sellPrice', label: 'Sell price', when: () => {
+        const status = document.getElementById('status')?.value;
+        return status === 'SOLD' || status === 'SALE_PENDING';
+      } },
+    ];
+
+    let firstError = null;
+    checks.forEach(({ id, label, when }) => {
+      const field = document.getElementById(id);
+      clearFieldError(field);
+      if (!field || (when && !when())) return;
+      const value = getNumericFieldValue(field);
+      if (value !== null && value < 0 && !firstError) {
+        setFieldError(field);
+        firstError = `${label} must be 0 or greater.`;
+      } else if (value !== null && value < 0) {
+        setFieldError(field);
+      }
+    });
+
+    return firstError;
+  }
 
   function renderGallery() {
     if (!imageGallery) return;
@@ -968,16 +1039,35 @@ async function loadAdminPage(token) {
   async function handleFiles(files) {
     if (!files || files.length === 0) return;
     const fileArray = Array.from(files);
-    uploadStatus.textContent = fileArray.length > 1
-      ? `Uploading ${fileArray.length} images…`
+    const validFiles = [];
+    const errors = [];
+    fileArray.forEach(file => {
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        errors.push(`${file.name}: ${validationError}`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (validFiles.length === 0) {
+      if (uploadStatus) {
+        uploadStatus.textContent = errors[0] || 'No valid images selected.';
+        uploadStatus.style.color = '#C62828';
+      }
+      if (imageFileInput) imageFileInput.value = '';
+      return;
+    }
+
+    uploadStatus.textContent = validFiles.length > 1
+      ? `Uploading ${validFiles.length} images…`
       : 'Uploading…';
     uploadStatus.style.color = 'var(--gold-dark)';
     dropZone.classList.add('drag-over');
 
     let successCount = 0;
-    const errors = [];
     // Upload in parallel
-    await Promise.all(fileArray.map(async file => {
+    await Promise.all(validFiles.map(async file => {
       try {
         const url = await apiUploadImage(token, file);
         imageUrls.push(url);
@@ -1041,13 +1131,13 @@ async function loadAdminPage(token) {
     if (enName) translations.push({ language: 'en', name: enName, description: fld('description')?.value.trim()   || null });
     if (esName) translations.push({ language: 'es', name: esName, description: fld('descriptionEs')?.value.trim() || null });
 
-    const costVal        = parseFloat(fld('cost')?.value);
-    const sellPriceVal   = parseFloat(fld('sellPrice')?.value);
-    const manualPriceVal = parseFloat(fld('manualPrice')?.value);
-    const weightVal      = parseFloat(fld('weight')?.value);
-    const markupFlatVal  = parseFloat(fld('markupFlat')?.value);
-    const markupLoanVal  = parseFloat(fld('markupLoan')?.value);
-    const purityKaratVal = parseFloat(purityKarat?.value);
+    const costVal        = getNumericFieldValue(fld('cost'));
+    const sellPriceVal   = getNumericFieldValue(fld('sellPrice'));
+    const manualPriceVal = getNumericFieldValue(fld('manualPrice'));
+    const weightVal      = getNumericFieldValue(fld('weight'));
+    const markupFlatVal  = getNumericFieldValue(fld('markupFlat'));
+    const markupLoanVal  = getNumericFieldValue(fld('markupLoan'));
+    const purityKaratVal = getNumericFieldValue(purityKarat);
     const quantityVal    = parseInt(fld('quantity')?.value, 10);
     const locVal         = locationSelect?.value;
 
@@ -1082,19 +1172,24 @@ async function loadAdminPage(token) {
       return;
     }
 
+    const nonNegativeError = validateNonNegativeFields();
+    if (nonNegativeError) {
+      showToast(nonNegativeError, 'error');
+      return;
+    }
+
     // Minimum price rule: listing price must be >= cost * 1.1
-    const _cost = parseFloat(document.getElementById('cost')?.value);
+    const _cost = getNumericFieldValue(document.getElementById('cost'));
     if (!isNaN(_cost) && _cost > 0) {
       let _listing = null;
       if (selectedMetal && spotPriceMap[selectedMetal.id]) {
-        const _w  = parseFloat(document.getElementById('weight')?.value);
-        const _k  = parseFloat(purityKarat?.value);
-        const _m  = parseFloat(document.getElementById('priceMultiplier')?.value);
-        const _fm = parseFloat(document.getElementById('flatMarkup')?.value) || 0;
-        if (!isNaN(_w) && !isNaN(_k) && !isNaN(_m)) {
+        const _w  = getNumericFieldValue(document.getElementById('weight'));
+        const _k  = getNumericFieldValue(purityKarat);
+        const _fm = getNumericFieldValue(document.getElementById('markupFlat')) || 0;
+        if (!isNaN(_w) && !isNaN(_k)) {
           const _spot = spotPriceMap[selectedMetal.id];
           const _mr   = (_w / GRAMS_PER_OZ) * _spot * (_k / selectedMetal.purity_denominator);
-          _listing = _mr * _m + _fm;
+          _listing = _mr + _fm;
         }
       }
       if (_listing !== null && _listing < _cost * 1.1) {
@@ -1133,6 +1228,7 @@ async function loadAdminPage(token) {
   /* -- Start editing a product -- */
   function startEdit(product) {
     editingId = product.id;
+    form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
     document.getElementById('productName').value    = product.name           || '';
     document.getElementById('productNameEs').value  = product.name_es        || '';
@@ -1199,6 +1295,7 @@ async function loadAdminPage(token) {
     const statusEl = document.getElementById('status');
     if (statusEl) statusEl.disabled = false;
     form.reset();
+    form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
     selectMetal(null);
     if (purityKarat) purityKarat.value = '';
     if (pricePreview) pricePreview.style.display = 'none';
