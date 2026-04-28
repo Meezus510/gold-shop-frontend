@@ -19,6 +19,16 @@ const TRANSLATIONS = {
     /* Language toggle */
     'lang.label': 'Language',
 
+    /* Login */
+    'login.title':    'Admin Login',
+    'login.subtitle': 'Enter your credentials to manage inventory.',
+    'login.username': 'Username',
+    'login.password': 'Password',
+    'login.button':   'Login',
+    'login.loading':  'Logging in…',
+    'login.invalid':  'Invalid username or password.',
+    'login.expired':  'Session expired. Please log in again.',
+
     /* Index hero */
     'hero.index.title':    'Our Collection',
     'hero.index.subtitle': 'Handcrafted gold jewelry & investment pieces, available in-store.',
@@ -107,13 +117,36 @@ const TRANSLATIONS = {
     'form.hint.karat':         'e.g. 22 for 22k gold (out of 24)',
     'form.hint.karat.gold':    'Karat out of 24 — e.g. 22 for 22k, 18 for 18k',
     'form.hint.karat.millesimal': 'Millesimal fineness out of {denom} — e.g. 925 for sterling silver',
-    'form.label.flat_markup':    'Flat Markup ($)',
-    'form.hint.flat_markup':     'Fixed dollar amount added on top of metal value × multiplier',
+    'form.label.flat_markup':    'Sell Price ($)',
+    'form.hint.flat_markup':     'Enter the final sell price; the difference from metal value is calculated automatically.',
+    'form.label.loan_markup':    'Loan Price ($)',
+    'form.hint.loan_markup':     'Leave blank to use the sell price. If entered, it must be at least the sell price.',
     'preview.title':             'Price Preview',
     'preview.market_rate':       'Metal value',
     'preview.listing_price':     'Listing price',
-    'preview.min_price':         'Minimum (cost + 10%)',
-    'preview.below_min':         'Below minimum — raise multiplier or markup',
+    'preview.flat_sale_price':   'Sell price',
+    'preview.loan_price':        'Loan price',
+    'preview.min_price':         'Minimum (market value + 10%)',
+    'preview.below_min':         'Below minimum — raise sell price',
+    'preview.fetching':          'Fetching…',
+    'preview.spot_unavailable':  'Spot price unavailable',
+    'validation.non_negative':   '{field} must be 0 or greater.',
+    'validation.field.cost':     'Cost',
+    'validation.field.weight':   'Weight',
+    'validation.field.flat_markup': 'Sell price',
+    'validation.field.loan_markup': 'Loan price',
+    'validation.field.manual_price': 'Manual price',
+    'validation.field.sell_price': 'Sell price',
+    'validation.min_listing':    'Sell price {price} is below the market value + 10% minimum ({minimum}).',
+    'validation.loan_below_sell': 'Loan price must be at least the sell price.',
+    'error.load_items':          'Failed to load items.',
+    'error.location_exists':     'Location already exists.',
+    'error.location_add':        'Failed to add location.',
+    'error.visibility_update':   'Failed to update visibility.',
+    'error.units_update':        'Failed to update units.',
+    'error.price_update':        'Failed to update prices.',
+    'error.save_item':           'Error saving item.',
+    'error.delete_item':         'Error deleting item.',
     'form.label.quantity':       'Quantity',
     'form.label.location':       'Purchase Location',
     'form.location.none':        '— None —',
@@ -133,8 +166,18 @@ const TRANSLATIONS = {
 
     /* Image upload */
     'upload.text': 'Click or drag & drop to upload',
-    'upload.hint': 'JPG, PNG, WEBP \u2014 max 5\u00a0MB',
+    'upload.hint': 'JPG/JPEG, PNG, WEBP — max 10 MB · multiple files OK',
     'upload.note': 'Image will be stored locally. For production, use a server upload.',
+    'upload.dropzone_label': 'Click or drag images to upload',
+    'upload.invalid_type': 'Unsupported file type. Use JPG, PNG, or WEBP.',
+    'upload.too_large': 'Image is too large. Max 10 MB.',
+    'upload.none_valid': 'No valid images selected.',
+    'upload.primary': 'Primary',
+    'upload.image_alt': 'Image {n}',
+    'upload.remove_image': 'Remove image {n}',
+    'upload.uploading': 'Uploading {count} image(s)…',
+    'upload.success': '✓ {count} image(s) uploaded',
+    'upload.partial': '{count} uploaded, {failed} failed: {error}',
 
     /* Stats */
     'stats.total':     'Total Items',
@@ -167,6 +210,7 @@ const TRANSLATIONS = {
     'sync.update_all':   'Update All Prices',
     'sync.updating':     'Updating…',
     'sync.updated':      'Prices updated',
+    'sync.updated_count': 'Prices updated: {count} items',
     'sync.recalc_item':  'Recalculate price',
     'sync.overdue':      'Due now',
     'sync.confirm_all':  'Update all item prices to current market value?',
@@ -176,6 +220,7 @@ const TRANSLATIONS = {
     'toast.updated':  'Item updated successfully.',
     'toast.deleted':  'Item deleted.',
     'toast.required': 'Please fill in all required fields.',
+    'toast.required_missing': 'Please complete: {fields}.',
 
     /* Auto-translate */
     'translate.loading': 'Translating\u2026',
@@ -202,6 +247,16 @@ const TRANSLATIONS = {
 
     /* Language toggle */
     'lang.label': 'Idioma',
+
+    /* Login */
+    'login.title':    'Inicio de Sesión de Admin',
+    'login.subtitle': 'Ingresa tus credenciales para administrar el inventario.',
+    'login.username': 'Usuario',
+    'login.password': 'Contraseña',
+    'login.button':   'Iniciar Sesión',
+    'login.loading':  'Iniciando sesión…',
+    'login.invalid':  'Usuario o contraseña inválidos.',
+    'login.expired':  'La sesión expiró. Inicia sesión de nuevo.',
 
     /* Index hero */
     'hero.index.title':    'Nuestra Colección',
@@ -291,13 +346,36 @@ const TRANSLATIONS = {
     'form.hint.karat':         'ej. 22 para oro 22k (de 24)',
     'form.hint.karat.gold':    'Quilates de 24 — ej. 22 para 22k, 18 para 18k',
     'form.hint.karat.millesimal': 'Fineza milésimal de {denom} — ej. 925 para plata esterlina',
-    'form.label.flat_markup':    'Margen Fijo ($)',
-    'form.hint.flat_markup':     'Cantidad fija añadida sobre el valor del metal × multiplicador',
+    'form.label.flat_markup':    'Precio de Venta ($)',
+    'form.hint.flat_markup':     'Ingresa el precio final de venta; la diferencia con el valor del metal se calcula automáticamente.',
+    'form.label.loan_markup':    'Precio de Préstamo ($)',
+    'form.hint.loan_markup':     'Déjalo en blanco para usar el precio de venta. Si lo ingresas, debe ser al menos el precio de venta.',
     'preview.title':             'Vista Previa del Precio',
     'preview.market_rate':       'Valor del metal',
     'preview.listing_price':     'Precio de venta',
-    'preview.min_price':         'Mínimo (costo + 10%)',
-    'preview.below_min':         'Por debajo del mínimo — sube el multiplicador o margen',
+    'preview.flat_sale_price':   'Precio de venta',
+    'preview.loan_price':        'Precio de préstamo',
+    'preview.min_price':         'Mínimo (valor del metal + 10%)',
+    'preview.below_min':         'Por debajo del mínimo — sube el precio de venta',
+    'preview.fetching':          'Buscando…',
+    'preview.spot_unavailable':  'Precio del metal no disponible',
+    'validation.non_negative':   '{field} debe ser 0 o mayor.',
+    'validation.field.cost':     'Costo',
+    'validation.field.weight':   'Peso',
+    'validation.field.flat_markup': 'Precio de venta',
+    'validation.field.loan_markup': 'Precio de préstamo',
+    'validation.field.manual_price': 'Precio manual',
+    'validation.field.sell_price': 'Precio de venta',
+    'validation.min_listing':    'El precio de venta {price} está por debajo del mínimo de valor del metal + 10% ({minimum}).',
+    'validation.loan_below_sell': 'El precio de préstamo debe ser al menos el precio de venta.',
+    'error.load_items':          'No se pudieron cargar los artículos.',
+    'error.location_exists':     'El lugar ya existe.',
+    'error.location_add':        'No se pudo agregar el lugar.',
+    'error.visibility_update':   'No se pudo actualizar la visibilidad.',
+    'error.units_update':        'No se pudieron actualizar las unidades.',
+    'error.price_update':        'No se pudieron actualizar los precios.',
+    'error.save_item':           'Error al guardar el artículo.',
+    'error.delete_item':         'Error al eliminar el artículo.',
     'form.label.quantity':       'Cantidad',
     'form.label.location':       'Lugar de Compra',
     'form.location.none':        '— Ninguno —',
@@ -317,8 +395,18 @@ const TRANSLATIONS = {
 
     /* Image upload */
     'upload.text': 'Haz clic o arrastra y suelta para subir',
-    'upload.hint': 'JPG, PNG, WEBP \u2014 m\u00e1x. 5\u00a0MB',
+    'upload.hint': 'JPG/JPEG, PNG, WEBP — máx. 10 MB · varios archivos OK',
     'upload.note': 'La imagen se guarda localmente. Para producción, usa un servidor.',
+    'upload.dropzone_label': 'Haz clic o arrastra imágenes para subir',
+    'upload.invalid_type': 'Tipo de archivo no compatible. Usa JPG, PNG o WEBP.',
+    'upload.too_large': 'La imagen es demasiado grande. Máx. 10 MB.',
+    'upload.none_valid': 'No se seleccionaron imágenes válidas.',
+    'upload.primary': 'Principal',
+    'upload.image_alt': 'Imagen {n}',
+    'upload.remove_image': 'Quitar imagen {n}',
+    'upload.uploading': 'Subiendo {count} imagen(es)…',
+    'upload.success': '✓ {count} imagen(es) subida(s)',
+    'upload.partial': '{count} subida(s), {failed} fallida(s): {error}',
 
     /* Stats */
     'stats.total':     'Total Artículos',
@@ -351,6 +439,7 @@ const TRANSLATIONS = {
     'sync.update_all':   'Actualizar Todos los Precios',
     'sync.updating':     'Actualizando…',
     'sync.updated':      'Precios actualizados',
+    'sync.updated_count': 'Precios actualizados: {count} artículos',
     'sync.recalc_item':  'Recalcular precio',
     'sync.overdue':      'Ya vencido',
     'sync.confirm_all':  '¿Actualizar todos los precios al valor de mercado actual?',
@@ -360,6 +449,7 @@ const TRANSLATIONS = {
     'toast.updated':  'Artículo actualizado exitosamente.',
     'toast.deleted':  'Artículo eliminado.',
     'toast.required': 'Por favor completa todos los campos obligatorios.',
+    'toast.required_missing': 'Por favor completa: {fields}.',
 
     /* Auto-translate */
     'translate.loading': 'Traduciendo\u2026',
@@ -453,4 +543,3 @@ document.addEventListener('DOMContentLoaded', () => {
   applyTranslations();
   initLangToggle();
 });
-

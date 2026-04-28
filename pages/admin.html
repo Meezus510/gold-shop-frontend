@@ -516,21 +516,21 @@
   <!-- ── Login modal ──────────────────────────────────────── -->
   <div id="loginModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
     <div class="modal-box">
-      <h2 id="loginTitle">Admin Login</h2>
-      <p>Enter your credentials to manage inventory.</p>
+      <h2 id="loginTitle" data-i18n="login.title">Admin Login</h2>
+      <p data-i18n="login.subtitle">Enter your credentials to manage inventory.</p>
       <form id="loginForm" novalidate>
         <div class="form-group">
-          <label class="form-label" for="loginUsername">Username</label>
+          <label class="form-label" for="loginUsername" data-i18n="login.username">Username</label>
           <input class="form-input" type="text" id="loginUsername" name="username"
             autocomplete="username" required autofocus>
         </div>
         <div class="form-group">
-          <label class="form-label" for="loginPassword">Password</label>
+          <label class="form-label" for="loginPassword" data-i18n="login.password">Password</label>
           <input class="form-input" type="password" id="loginPassword" name="password"
             autocomplete="current-password" required>
         </div>
         <p id="loginError" class="login-error" aria-live="polite"></p>
-        <button class="btn-primary" type="submit" style="width:100%;">Login</button>
+        <button class="btn-primary" type="submit" style="width:100%;" data-i18n="login.button">Login</button>
       </form>
     </div>
   </div>
@@ -744,35 +744,33 @@
                   >
                 </div>
                 <div class="form-group">
-                  <label class="form-label" for="markupFlat">Flat Sale Markup ($)</label>
+                  <label class="form-label" for="markupFlat" data-i18n="form.label.flat_markup">Sell Price ($)</label>
                   <input
                     class="form-input"
                     type="number"
                     id="markupFlat"
                     name="markupFlat"
-                    placeholder="e.g. 80"
+                    placeholder="e.g. 360"
                     min="0"
                     step="0.01"
-                    value="0"
                   >
-                  <p class="form-hint">$ added above metal value for flat sale price</p>
+                  <p class="form-hint" data-i18n="form.hint.flat_markup">Enter the final sell price; the difference from metal value is calculated automatically.</p>
                 </div>
               </div>
 
-              <!-- Loan Markup -->
+              <!-- Loan Price -->
               <div class="form-group">
-                <label class="form-label" for="markupLoan">Loan Markup ($)</label>
+                <label class="form-label" for="markupLoan" data-i18n="form.label.loan_markup">Loan Price ($)</label>
                 <input
                   class="form-input"
                   type="number"
                   id="markupLoan"
                   name="markupLoan"
-                  placeholder="e.g. 50"
+                  placeholder="Optional"
                   min="0"
                   step="0.01"
-                  value="0"
                 >
-                <p class="form-hint">$ added above metal value for loan price</p>
+                <p class="form-hint" data-i18n="form.hint.loan_markup">Leave blank to use the sell price. If entered, it must be at least the sell price.</p>
               </div>
 
               <!-- Manual price (N/A — no metal selected) -->
@@ -796,22 +794,22 @@
               <div id="pricePreview" class="price-preview" style="display:none;" aria-live="polite">
                 <div class="price-preview-title" data-i18n="preview.title">Price Preview</div>
                 <div class="price-preview-row">
-                  <span class="price-preview-label">Metal value</span>
+                  <span class="price-preview-label" data-i18n="preview.market_rate">Metal value</span>
                   <span class="price-preview-value" id="previewMarketRate">—</span>
                 </div>
                 <div class="price-preview-row">
-                  <span class="price-preview-label">Flat sale price</span>
+                  <span class="price-preview-label" data-i18n="preview.flat_sale_price">Sell price</span>
                   <span class="price-preview-value accent" id="previewListingPrice">—</span>
                 </div>
                 <div class="price-preview-row">
-                  <span class="price-preview-label">Loan price</span>
+                  <span class="price-preview-label" data-i18n="preview.loan_price">Loan price</span>
                   <span class="price-preview-value accent" id="previewLoanPrice">—</span>
                 </div>
                 <div class="price-preview-row" id="previewMinRow" style="display:none;">
-                  <span class="price-preview-label">Minimum (cost + 10%)</span>
+                  <span class="price-preview-label" data-i18n="preview.min_price">Minimum (market value + 10%)</span>
                   <span class="price-preview-value" id="previewMin">—</span>
                 </div>
-                <p class="price-preview-warning" id="previewWarning" style="display:none;">Below minimum — raise markup</p>
+                <p class="price-preview-warning" id="previewWarning" style="display:none;" data-i18n="preview.below_min">Below minimum — raise sell price</p>
               </div>
 
               <!-- Cost + Status -->
@@ -915,7 +913,7 @@
 
                 <!-- Drop zone -->
                 <div id="dropZone" class="upload-dropzone" role="button" tabindex="0"
-                  aria-label="Click or drag images to upload">
+                  aria-label="Click or drag images to upload" data-i18n-aria="upload.dropzone_label">
                   <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
                     fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"
                     stroke-linejoin="round" aria-hidden="true">
