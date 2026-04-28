@@ -442,7 +442,7 @@ function showLoginModal() {
     const btn      = loginForm.querySelector('button[type="submit"]');
 
     btn.disabled    = true;
-    btn.textContent = 'Logging in…';
+    btn.textContent = t('login.loading');
 
     try {
       const token = await apiLogin(username, password);
@@ -450,10 +450,10 @@ function showLoginModal() {
       modal.classList.remove('visible');
       await loadAdminPage(token);
     } catch (_) {
-      loginError.textContent = 'Invalid username or password.';
+      loginError.textContent = t('login.invalid');
     } finally {
       btn.disabled    = false;
-      btn.textContent = 'Login';
+      btn.textContent = t('login.button');
     }
   });
 }
@@ -461,7 +461,7 @@ function showLoginModal() {
 function handleAuthError() {
   sessionStorage.removeItem('goldshop_token');
   showLoginModal();
-  showToast('Session expired. Please log in again.', 'error');
+  showToast(t('login.expired'), 'error');
 }
 
 /* ── Admin — main init ─────────────────────────────────────── */
@@ -602,9 +602,9 @@ async function loadAdminPage(token) {
         // Already exists — just select it
         const existing = locations.find(l => l.name.toLowerCase() === name.toLowerCase());
         if (existing) { populateLocationSelect(existing.id); newLocationGroup.style.display = 'none'; }
-        else showToast(err.message || 'Location already exists.', 'error');
+        else showToast(err.message || t('error.location_exists'), 'error');
       } else {
-        showToast(err.message || 'Failed to add location.', 'error');
+        showToast(err.message || t('error.location_add'), 'error');
       }
     } finally {
       addLocationBtn.disabled = false;
@@ -659,52 +659,64 @@ async function loadAdminPage(token) {
 
   const GRAMS_PER_OZ = 31.1035;
 
+  function calculateMetalValue() {
+    if (!selectedMetal) return null;
+
+    const spotPrice   = spotPriceMap[selectedMetal.id];
+    const weightGrams = getNumericFieldValue(document.getElementById('weight'));
+    const karat       = getNumericFieldValue(purityKarat);
+
+    if (!spotPrice || weightGrams === null || karat === null) return null;
+
+    return (
+      (weightGrams / GRAMS_PER_OZ)
+      * spotPrice
+      * (karat / selectedMetal.purity_denominator)
+    );
+  }
+
   function updatePricePreview() {
     if (!selectedMetal || !pricePreview) return;
 
     pricePreview.style.display = '';
 
     const spotPrice   = spotPriceMap[selectedMetal.id];
-    const weightGrams = parseFloat(document.getElementById('weight')?.value);
-    const karat       = parseFloat(purityKarat?.value);
-    const markupFlat  = parseFloat(document.getElementById('markupFlat')?.value) || 0;
-    const markupLoan  = parseFloat(document.getElementById('markupLoan')?.value) || 0;
-    const denom       = selectedMetal.purity_denominator;
+    const sellPrice   = getNumericFieldValue(document.getElementById('markupFlat'));
+    const loanInput   = getNumericFieldValue(document.getElementById('markupLoan'));
 
     // Spot price not yet available
     if (!spotPrice) {
       if (previewMarketRate) previewMarketRate.textContent = '—';
       if (previewListingPrice) {
-        previewListingPrice.textContent = spotPricesFetching ? 'Fetching…'
-          : spotPricesFailed            ? 'Spot price unavailable'
+        previewListingPrice.textContent = spotPricesFetching ? t('preview.fetching')
+          : spotPricesFailed            ? t('preview.spot_unavailable')
           :                               '—';
       }
       if (previewLoanPrice) previewLoanPrice.textContent = '—';
       return;
     }
 
-    if (isNaN(weightGrams) || isNaN(karat)) {
+    const marketRate = calculateMetalValue();
+    if (marketRate === null) {
       if (previewMarketRate)   previewMarketRate.textContent   = '—';
       if (previewListingPrice) previewListingPrice.textContent = '—';
       if (previewLoanPrice)    previewLoanPrice.textContent    = '—';
       return;
     }
 
-    const marketRate  = (weightGrams / GRAMS_PER_OZ) * spotPrice * (karat / denom);
-    const flatPrice   = marketRate + markupFlat;
-    const loanPrice   = marketRate + markupLoan;
+    const flatPrice = sellPrice === null ? null : sellPrice;
+    const loanPrice = flatPrice === null ? null : (loanInput === null ? flatPrice : loanInput);
 
     if (previewMarketRate)   previewMarketRate.textContent   = formatPrice(marketRate);
-    if (previewListingPrice) previewListingPrice.textContent = formatPrice(flatPrice);
-    if (previewLoanPrice)    previewLoanPrice.textContent    = formatPrice(loanPrice);
+    if (previewListingPrice) previewListingPrice.textContent = flatPrice === null ? '—' : formatPrice(flatPrice);
+    if (previewLoanPrice)    previewLoanPrice.textContent    = loanPrice === null ? '—' : formatPrice(loanPrice);
 
-    // Minimum price rule: flat listing must be >= cost * 1.1
-    const cost    = parseFloat(document.getElementById('cost')?.value);
-    const minPrice = (!isNaN(cost) && cost > 0) ? cost * 1.1 : null;
-    const belowMin = minPrice !== null && flatPrice < minPrice;
+    // Minimum price rule: flat listing must be >= market value + 10%.
+    const minPrice = marketRate * 1.1;
+    const belowMin = flatPrice !== null && flatPrice < minPrice;
 
-    if (previewMinRow)  previewMinRow.style.display  = minPrice !== null ? '' : 'none';
-    if (previewMin)     previewMin.textContent        = minPrice !== null ? formatPrice(minPrice) : '—';
+    if (previewMinRow)  previewMinRow.style.display  = '';
+    if (previewMin)     previewMin.textContent        = formatPrice(minPrice);
     if (previewWarning) previewWarning.style.display  = belowMin ? '' : 'none';
     if (pricePreview)   pricePreview.classList.toggle('below-min', belowMin);
   }
@@ -733,9 +745,20 @@ async function loadAdminPage(token) {
 
   // Wire live price preview on input changes
   ['weight', 'markupFlat', 'markupLoan', 'cost'].forEach(id => {
-    document.getElementById(id)?.addEventListener('input', updatePricePreview);
+    const field = document.getElementById(id);
+    field?.addEventListener('input', () => {
+      clearFieldError(field);
+      updatePricePreview();
+    });
   });
-  purityKarat?.addEventListener('input', updatePricePreview);
+  purityKarat?.addEventListener('input', () => {
+    clearFieldError(purityKarat);
+    updatePricePreview();
+  });
+  ['manualPrice', 'sellPrice'].forEach(id => {
+    const field = document.getElementById(id);
+    field?.addEventListener('input', () => clearFieldError(field));
+  });
 
   /* -- Logout -- */
   if (logoutBtn) {
@@ -753,7 +776,7 @@ async function loadAdminPage(token) {
       updateStats(products);
     } catch (err) {
       if (err.status === 401) { handleAuthError(); return; }
-      showToast('Failed to load items.', 'error');
+      showToast(t('error.load_items'), 'error');
     }
   }
 
@@ -841,7 +864,7 @@ async function loadAdminPage(token) {
           await reloadTable();
         } catch (err) {
           if (err.status === 401) { handleAuthError(); return; }
-          showToast(err.message || 'Failed to update visibility.', 'error');
+          showToast(err.message || t('error.visibility_update'), 'error');
           el.disabled = false;
         }
       });
@@ -859,7 +882,7 @@ async function loadAdminPage(token) {
             await reloadTable();
           } catch (err) {
             if (err.status === 401) { handleAuthError(); return; }
-            showToast(err.message || 'Failed to update units.', 'error');
+            showToast(err.message || t('error.units_update'), 'error');
             btn.disabled = false;
           }
         });
@@ -920,11 +943,11 @@ async function loadAdminPage(token) {
         syncNextAt = result.next_sync_at ? new Date(result.next_sync_at) : null;
         updateCountdownDisplay();
         if (syncLastUpdatedEl) syncLastUpdatedEl.textContent = new Date().toLocaleString();
-        showToast(`${t('sync.updated')}: ${result.total_updated} items`, 'success');
+        showToast(t('sync.updated_count', { count: result.total_updated }), 'success');
         await reloadTable();
       } catch (err) {
         if (err.status === 401) { handleAuthError(); return; }
-        showToast(err.message || 'Failed to update prices.', 'error');
+        showToast(err.message || t('error.price_update'), 'error');
       } finally {
         updateAllBtn.disabled    = false;
         updateAllBtn.textContent = t('sync.update_all');
@@ -937,9 +960,69 @@ async function loadAdminPage(token) {
   const imageFileInput = document.getElementById('imageFile');
   const imageGallery   = document.getElementById('imageGallery');
   const uploadStatus   = document.getElementById('uploadStatus');
+  const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+  const ALLOWED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
   // In-memory ordered list of image URLs for the current form session
   let imageUrls = [];
+
+  function clearFieldError(field) {
+    field?.classList.remove('input-error');
+  }
+
+  function setFieldError(field) {
+    field?.classList.add('input-error');
+  }
+
+  function validateImageFile(file) {
+    const hasValidMime = ALLOWED_IMAGE_TYPES.has(file.type);
+    const hasValidExt = /\.(jpe?g|png|webp)$/i.test(file.name || '');
+    if (!hasValidMime && !(file.type === '' && hasValidExt)) {
+      return t('upload.invalid_type');
+    }
+    if (file.size > MAX_IMAGE_SIZE_BYTES) {
+      return t('upload.too_large');
+    }
+    return null;
+  }
+
+  function getNumericFieldValue(field) {
+    if (!field) return null;
+    const raw = field.value.trim();
+    if (raw === '') return null;
+    const value = parseFloat(raw);
+    return Number.isNaN(value) ? null : value;
+  }
+
+  function validateNonNegativeFields() {
+    const checks = [
+      { id: 'cost', labelKey: 'validation.field.cost' },
+      { id: 'weight', labelKey: 'validation.field.weight' },
+      { id: 'markupFlat', labelKey: 'validation.field.flat_markup' },
+      { id: 'markupLoan', labelKey: 'validation.field.loan_markup' },
+      { id: 'manualPrice', labelKey: 'validation.field.manual_price', when: () => !selectedMetal },
+      { id: 'sellPrice', labelKey: 'validation.field.sell_price', when: () => {
+        const status = document.getElementById('status')?.value;
+        return status === 'SOLD' || status === 'SALE_PENDING';
+      } },
+    ];
+
+    let firstError = null;
+    checks.forEach(({ id, labelKey, when }) => {
+      const field = document.getElementById(id);
+      clearFieldError(field);
+      if (!field || (when && !when())) return;
+      const value = getNumericFieldValue(field);
+      if (value !== null && value < 0 && !firstError) {
+        setFieldError(field);
+        firstError = t('validation.non_negative', { field: t(labelKey) });
+      } else if (value !== null && value < 0) {
+        setFieldError(field);
+      }
+    });
+
+    return firstError;
+  }
 
   function renderGallery() {
     if (!imageGallery) return;
@@ -953,9 +1036,9 @@ async function loadAdminPage(token) {
       const thumb = document.createElement('div');
       thumb.className = 'image-thumb';
       thumb.innerHTML = `
-        <img src="${escapeAttr(url)}" alt="Image ${idx + 1}">
-        ${idx === 0 ? '<div class="primary-badge">Primary</div>' : ''}
-        <button type="button" class="remove-btn" aria-label="Remove image ${idx + 1}">✕</button>
+        <img src="${escapeAttr(url)}" alt="${escapeAttr(t('upload.image_alt', { n: idx + 1 }))}">
+        ${idx === 0 ? `<div class="primary-badge">${t('upload.primary')}</div>` : ''}
+        <button type="button" class="remove-btn" aria-label="${escapeAttr(t('upload.remove_image', { n: idx + 1 }))}">✕</button>
       `;
       thumb.querySelector('.remove-btn').addEventListener('click', () => {
         imageUrls.splice(idx, 1);
@@ -968,16 +1051,33 @@ async function loadAdminPage(token) {
   async function handleFiles(files) {
     if (!files || files.length === 0) return;
     const fileArray = Array.from(files);
-    uploadStatus.textContent = fileArray.length > 1
-      ? `Uploading ${fileArray.length} images…`
-      : 'Uploading…';
+    const validFiles = [];
+    const errors = [];
+    fileArray.forEach(file => {
+      const validationError = validateImageFile(file);
+      if (validationError) {
+        errors.push(`${file.name}: ${validationError}`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (validFiles.length === 0) {
+      if (uploadStatus) {
+        uploadStatus.textContent = errors[0] || t('upload.none_valid');
+        uploadStatus.style.color = '#C62828';
+      }
+      if (imageFileInput) imageFileInput.value = '';
+      return;
+    }
+
+    uploadStatus.textContent = t('upload.uploading', { count: validFiles.length });
     uploadStatus.style.color = 'var(--gold-dark)';
     dropZone.classList.add('drag-over');
 
     let successCount = 0;
-    const errors = [];
     // Upload in parallel
-    await Promise.all(fileArray.map(async file => {
+    await Promise.all(validFiles.map(async file => {
       try {
         const url = await apiUploadImage(token, file);
         imageUrls.push(url);
@@ -991,10 +1091,14 @@ async function loadAdminPage(token) {
     renderGallery();
 
     if (errors.length === 0) {
-      uploadStatus.textContent = `✓ ${successCount} image${successCount > 1 ? 's' : ''} uploaded`;
+      uploadStatus.textContent = t('upload.success', { count: successCount });
       uploadStatus.style.color = '#2E7D32';
     } else {
-      uploadStatus.textContent = `${successCount} uploaded, ${errors.length} failed: ${errors[0]}`;
+      uploadStatus.textContent = t('upload.partial', {
+        count: successCount,
+        failed: errors.length,
+        error: errors[0]
+      });
       uploadStatus.style.color = '#C62828';
     }
     if (imageFileInput) imageFileInput.value = '';
@@ -1041,24 +1145,31 @@ async function loadAdminPage(token) {
     if (enName) translations.push({ language: 'en', name: enName, description: fld('description')?.value.trim()   || null });
     if (esName) translations.push({ language: 'es', name: esName, description: fld('descriptionEs')?.value.trim() || null });
 
-    const costVal        = parseFloat(fld('cost')?.value);
-    const sellPriceVal   = parseFloat(fld('sellPrice')?.value);
-    const manualPriceVal = parseFloat(fld('manualPrice')?.value);
-    const weightVal      = parseFloat(fld('weight')?.value);
-    const markupFlatVal  = parseFloat(fld('markupFlat')?.value);
-    const markupLoanVal  = parseFloat(fld('markupLoan')?.value);
-    const purityKaratVal = parseFloat(purityKarat?.value);
+    const costVal        = getNumericFieldValue(fld('cost'));
+    const sellPriceVal   = getNumericFieldValue(fld('sellPrice'));
+    const manualPriceVal = getNumericFieldValue(fld('manualPrice'));
+    const weightVal      = getNumericFieldValue(fld('weight'));
+    const enteredSellPriceVal = getNumericFieldValue(fld('markupFlat'));
+    const enteredLoanPriceVal = getNumericFieldValue(fld('markupLoan'));
+    const purityKaratVal = getNumericFieldValue(purityKarat);
     const quantityVal    = parseInt(fld('quantity')?.value, 10);
     const locVal         = locationSelect?.value;
+    const marketValue    = calculateMetalValue();
+    const markupFlatVal  = selectedMetal && marketValue !== null && enteredSellPriceVal !== null
+      ? Math.max(enteredSellPriceVal - marketValue, 0)
+      : null;
+    const markupLoanVal  = selectedMetal && enteredSellPriceVal !== null
+      ? Math.max((enteredLoanPriceVal ?? enteredSellPriceVal) - enteredSellPriceVal, 0)
+      : null;
 
     return {
       category:             fld('category')?.value || '',
       metal_id:             selectedMetal ? selectedMetal.id : null,
-      purity_karat:         selectedMetal && !isNaN(purityKaratVal) ? purityKaratVal : null,
-      weight_grams:         isNaN(weightVal)      ? null : weightVal,
-      markup_flat:          selectedMetal && !isNaN(markupFlatVal)  ? markupFlatVal  : null,
-      markup_loan:          selectedMetal && !isNaN(markupLoanVal)  ? markupLoanVal  : null,
-      listed_price_flat:    !selectedMetal && !isNaN(manualPriceVal) ? manualPriceVal : null,
+      purity_karat:         selectedMetal && purityKaratVal !== null ? purityKaratVal : null,
+      weight_grams:         weightVal === null      ? null : weightVal,
+      markup_flat:          selectedMetal ? markupFlatVal : null,
+      markup_loan:          selectedMetal ? markupLoanVal : null,
+      listed_price_flat:    !selectedMetal && manualPriceVal !== null ? manualPriceVal : null,
       quantity:             isNaN(quantityVal)    ? 1    : quantityVal,
       purchase_location_id: (locVal && locVal !== '__new__') ? parseInt(locVal, 10) : null,
       cost:                 isNaN(costVal)        ? null : costVal,
@@ -1077,31 +1188,46 @@ async function loadAdminPage(token) {
     const missingName   = !document.getElementById('productName')?.value.trim();
     const missingKarat  = selectedMetal && !purityKarat?.value;
     const missingWeight = selectedMetal && !document.getElementById('weight')?.value;
-    if (missingName || missingKarat || missingWeight) {
-      showToast(t('toast.required'), 'error');
+    const enteredSellPrice = getNumericFieldValue(document.getElementById('markupFlat'));
+    const enteredLoanPrice = getNumericFieldValue(document.getElementById('markupLoan'));
+    const missingSellPrice = selectedMetal && enteredSellPrice === null;
+    const missingFields = [];
+    if (missingName) missingFields.push(t('form.label.name'));
+    if (missingKarat) missingFields.push(t('form.label.karat'));
+    if (missingWeight) missingFields.push(t('form.label.weight'));
+    if (missingSellPrice) missingFields.push(t('form.label.flat_markup'));
+    if (missingFields.length > 0) {
+      showToast(t('toast.required_missing', { fields: missingFields.join(', ') }), 'error');
       return;
     }
 
-    // Minimum price rule: listing price must be >= cost * 1.1
-    const _cost = parseFloat(document.getElementById('cost')?.value);
-    if (!isNaN(_cost) && _cost > 0) {
-      let _listing = null;
-      if (selectedMetal && spotPriceMap[selectedMetal.id]) {
-        const _w  = parseFloat(document.getElementById('weight')?.value);
-        const _k  = parseFloat(purityKarat?.value);
-        const _m  = parseFloat(document.getElementById('priceMultiplier')?.value);
-        const _fm = parseFloat(document.getElementById('flatMarkup')?.value) || 0;
-        if (!isNaN(_w) && !isNaN(_k) && !isNaN(_m)) {
-          const _spot = spotPriceMap[selectedMetal.id];
-          const _mr   = (_w / GRAMS_PER_OZ) * _spot * (_k / selectedMetal.purity_denominator);
-          _listing = _mr * _m + _fm;
-        }
+    const nonNegativeError = validateNonNegativeFields();
+    if (nonNegativeError) {
+      showToast(nonNegativeError, 'error');
+      return;
+    }
+
+    if (selectedMetal) {
+      const marketValue = calculateMetalValue();
+      if (marketValue === null) {
+        showToast(t('preview.spot_unavailable'), 'error');
+        return;
       }
-      if (_listing !== null && _listing < _cost * 1.1) {
+
+      const minimumPrice = marketValue * 1.1;
+      if (enteredSellPrice < minimumPrice) {
         showToast(
-          `Listing price ${formatPrice(_listing)} is below cost + 10% minimum (${formatPrice(_cost * 1.1)}).`,
+          t('validation.min_listing', {
+            price: formatPrice(enteredSellPrice),
+            minimum: formatPrice(minimumPrice)
+          }),
           'error'
         );
+        return;
+      }
+
+      if (enteredLoanPrice !== null && enteredLoanPrice < enteredSellPrice) {
+        showToast(t('validation.loan_below_sell'), 'error');
         return;
       }
     }
@@ -1121,7 +1247,7 @@ async function loadAdminPage(token) {
       await reloadTable();
     } catch (err) {
       if (err.status === 401) { handleAuthError(); return; }
-      showToast(err.message || 'Error saving item.', 'error');
+      showToast(err.message || t('error.save_item'), 'error');
     } finally {
       submitBtn.disabled = false;
     }
@@ -1133,6 +1259,7 @@ async function loadAdminPage(token) {
   /* -- Start editing a product -- */
   function startEdit(product) {
     editingId = product.id;
+    form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
 
     document.getElementById('productName').value    = product.name           || '';
     document.getElementById('productNameEs').value  = product.name_es        || '';
@@ -1140,8 +1267,13 @@ async function loadAdminPage(token) {
     document.getElementById('descriptionEs').value  = product.description_es || '';
     document.getElementById('category').value       = product.category;
     document.getElementById('weight').value        = product.weight_grams   ?? '';
-    document.getElementById('markupFlat').value    = product.markup_flat    ?? 0;
-    document.getElementById('markupLoan').value    = product.markup_loan    ?? 0;
+    const productFlatPrice = Number(product.listed_price_flat);
+    const productLoanPrice = Number(product.listed_price_loan);
+    document.getElementById('markupFlat').value    = Number.isNaN(productFlatPrice) ? '' : productFlatPrice;
+    document.getElementById('markupLoan').value    =
+      !Number.isNaN(productLoanPrice) && !Number.isNaN(productFlatPrice) && productLoanPrice > productFlatPrice
+        ? productLoanPrice
+        : '';
     document.getElementById('quantity').value      = product.quantity       ?? 1;
     document.getElementById('cost').value          = product.cost           ?? '';
     document.getElementById('sellPrice').value     = product.sell_price     ?? '';
@@ -1189,7 +1321,7 @@ async function loadAdminPage(token) {
       await reloadTable();
     } catch (err) {
       if (err.status === 401) { handleAuthError(); return; }
-      showToast(err.message || 'Error deleting item.', 'error');
+      showToast(err.message || t('error.delete_item'), 'error');
     }
   }
 
@@ -1199,6 +1331,7 @@ async function loadAdminPage(token) {
     const statusEl = document.getElementById('status');
     if (statusEl) statusEl.disabled = false;
     form.reset();
+    form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
     selectMetal(null);
     if (purityKarat) purityKarat.value = '';
     if (pricePreview) pricePreview.style.display = 'none';

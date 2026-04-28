@@ -65,6 +65,13 @@ button, input, select, textarea {
   font-size: inherit;
 }
 
+input.input-error,
+select.input-error,
+textarea.input-error {
+  border-color: var(--status-sold) !important;
+  box-shadow: 0 0 0 3px rgba(198, 40, 40, .12);
+}
+
 /* ── Google Fonts import (inline @import for portability) ─── */
 @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
 

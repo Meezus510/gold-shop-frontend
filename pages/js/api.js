@@ -14,7 +14,19 @@ const API_BASE = window.APP_CONFIG?.API_BASE || 'http://localhost:8000';
 /* ── Internal fetch wrapper ────────────────────────────────── */
 
 async function _apiFetch(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, options);
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, options);
+  } catch (cause) {
+    const err = new Error(
+      path === '/admin/upload-image'
+        ? 'Image upload failed. Check your connection and try again.'
+        : 'Request failed. Check your connection and try again.'
+    );
+    err.cause = cause;
+    err.isNetworkError = true;
+    throw err;
+  }
 
   if (res.status === 401) {
     // Token expired or invalid — let callers handle this
@@ -69,6 +81,8 @@ function _normalizeAdmin(item) {
   const en = item.translations?.find(t => t.language === 'en') || {};
   const es = item.translations?.find(t => t.language === 'es') || {};
   const imagesSorted = (item.images || []).slice().sort((a, b) => a.position - b.position);
+  const markupFlat = item.markup_flat ?? item.flat_markup ?? null;
+  const markupLoan = item.markup_loan ?? item.loan_markup ?? null;
   return {
     ...item,
     id:             item.item_id,
@@ -78,7 +92,9 @@ function _normalizeAdmin(item) {
     description_es: es.description || '',
     image_url:      imagesSorted[0]?.url || null,
     image_urls:     imagesSorted.map(img => img.url),
-    flat_markup:        item.flat_markup        ?? null,
+    flat_markup:        markupFlat,
+    markup_flat:        markupFlat,
+    markup_loan:        markupLoan,
     quantity:           item.quantity            ?? 1,
     quantity_available: item.quantity_available  ?? 0,
     quantity_pending:   item.quantity_pending    ?? 0,
