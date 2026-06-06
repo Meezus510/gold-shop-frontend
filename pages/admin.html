@@ -183,6 +183,77 @@
       cursor: default;
     }
 
+    .item-number-row {
+      max-width: 180px;
+    }
+
+    .admin-filter-panel {
+      padding: 14px 16px;
+      margin-bottom: 14px;
+    }
+    .admin-filter-search {
+      position: relative;
+      margin-bottom: 10px;
+    }
+    .admin-filter-search svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+    .admin-filter-search input {
+      width: 100%;
+      height: 38px;
+      padding: 0 12px 0 36px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text-primary);
+      background: var(--white);
+    }
+    .admin-filter-search input:focus {
+      outline: none;
+      border-color: var(--gold-dark);
+    }
+    .admin-filter-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+    .admin-filter-row .filter-label {
+      min-width: 48px;
+      margin-right: 0;
+    }
+    .admin-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .admin-filter-bottom {
+      justify-content: space-between;
+      align-items: center;
+    }
+    .admin-filter-bottom .sort-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .admin-filter-panel .sort-select {
+      height: 32px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--white);
+      color: var(--text-primary);
+      padding: 0 26px 0 10px;
+      font-size: 13px;
+    }
+
     /* ── Image gallery ── */
     .image-gallery {
       display: flex;
@@ -557,6 +628,10 @@
           <span data-i18n="admin.badge">Admin</span>
         </span>
         <button id="logoutBtn" class="btn-logout" type="button">Logout</button>
+        <a href="admin-requests.html" class="btn-admin">
+          <span data-i18n="admin.requests">Requests</span>
+          <span id="requestBadge" class="request-badge" style="display:none;">0</span>
+        </a>
         <a href="admin-batch.html" class="btn-admin">Batch Upload</a>
         <a href="index.html" class="btn-admin" data-i18n="nav.viewStore">View Store</a>
         <div class="lang-toggle" role="group" data-i18n-aria="lang.label" aria-label="Language">
@@ -602,6 +677,24 @@
                 <span class="lang-section-tag en">EN</span>
                 <span class="lang-section-line"></span>
                 <span id="translateIndicatorEn" class="translate-indicator" aria-live="polite"></span>
+              </div>
+
+              <!-- Item Number -->
+              <div class="form-group item-number-row">
+                <label class="form-label" for="itemNumber">
+                  <span data-i18n="form.label.item_number">Item Number</span>
+                </label>
+                <input
+                  class="form-input"
+                  type="number"
+                  id="itemNumber"
+                  name="itemNumber"
+                  data-i18n-placeholder="form.placeholder.item_number"
+                  placeholder="Auto"
+                  min="1"
+                  step="1"
+                >
+                <p class="form-hint" data-i18n="form.hint.item_number">Leave blank to use the next number.</p>
               </div>
 
               <!-- Name (EN) -->
@@ -685,7 +778,7 @@
                   <option value="bangle"    data-i18n="cat.bangle">Bangle</option>
                   <option value="earring"   data-i18n="cat.earring">Earring</option>
                   <option value="earrings"  data-i18n="cat.earrings">Earrings</option>
-                  <option value="broqueles">Broqueles</option>
+                  <option value="broqueles" data-i18n="cat.broqueles">Broqueles</option>
                   <option value="ring"      data-i18n="cat.ring">Ring</option>
                   <option value="bracelet"  data-i18n="cat.bracelet">Bracelet</option>
                   <option value="pendant"   data-i18n="cat.pendant">Pendant</option>
@@ -706,6 +799,18 @@
                   <!-- Pills injected by app.js after fetching /metals -->
                 </div>
                 <input type="hidden" id="metalId" name="metalId" value="">
+              </div>
+
+              <!-- Pricing mode (metal items only) -->
+              <div class="form-group" id="pricingModeGroup" style="display:none;">
+                <label class="form-label" for="pricingMode">
+                  <span data-i18n="form.label.pricing_mode">Pricing Mode</span>
+                </label>
+                <select class="form-select" id="pricingMode" name="pricingMode">
+                  <option value="METAL_DYNAMIC" data-i18n="pricing.dynamic">Full metal item</option>
+                  <option value="MANUAL" data-i18n="pricing.manual">Mixed / manual price</option>
+                </select>
+                <p class="form-hint" id="pricingModeHint" data-i18n="pricing.hint.dynamic">Uses weight and market value to calculate pricing.</p>
               </div>
 
               <!-- Karat / Purity (visible only when a metal is selected) -->
@@ -731,6 +836,7 @@
                 <div class="form-group">
                   <label class="form-label" for="weight">
                     <span data-i18n="form.label.weight">Weight (g)</span>
+                    <span class="required" aria-hidden="true" id="weightRequired">*</span>
                   </label>
                   <input
                     class="form-input"
@@ -1001,6 +1107,68 @@
               </div>
             </div>
 
+            <div class="admin-filter-panel" role="search" aria-label="Filter inventory">
+              <div class="admin-filter-search">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14"
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                  <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                <input type="search" id="adminSearch" data-i18n-placeholder="search.placeholder"
+                  placeholder="Search items…" autocomplete="off" spellcheck="false">
+              </div>
+
+              <div class="admin-filter-row">
+                <span class="filter-label" data-i18n="filter.label">Filter:</span>
+                <div class="admin-filter-group" id="adminCategoryFilterGroup">
+                  <button class="filter-btn active" data-filter="all" data-i18n="filter.all">All</button>
+                  <button class="filter-btn" data-filter="necklace" data-i18n="filter.necklaces">Necklaces</button>
+                  <button class="filter-btn" data-filter="bangle" data-i18n="filter.bangles">Bangles</button>
+                  <button class="filter-btn" data-filter="earring" data-i18n="filter.earrings">Earrings</button>
+                  <button class="filter-btn" data-filter="broqueles" data-i18n="cat.broqueles">Broqueles</button>
+                  <button class="filter-btn" data-filter="ring" data-i18n="filter.rings">Rings</button>
+                  <button class="filter-btn" data-filter="bracelet" data-i18n="filter.bracelets">Bracelets</button>
+                  <button class="filter-btn" data-filter="pendant" data-i18n="cat.pendant">Pendant</button>
+                  <button class="filter-btn" data-filter="chain" data-i18n="cat.chain">Chain</button>
+                  <button class="filter-btn" data-filter="coin" data-i18n="filter.coins">Coins &amp; Bars</button>
+                </div>
+              </div>
+
+              <div class="admin-filter-row" id="adminMetalFilterRow" style="display:none;">
+                <span class="filter-label" data-i18n="filter.metal">Metal:</span>
+                <div class="admin-filter-group" id="adminMetalFilterGroup"></div>
+              </div>
+
+              <div class="admin-filter-row" id="adminPurityFilterRow" style="display:none;">
+                <span class="filter-label" data-i18n="filter.purity">Purity:</span>
+                <div class="admin-filter-group" id="adminPurityFilterGroup"></div>
+              </div>
+
+              <div class="admin-filter-row" id="adminStatusFilterRow">
+                <span class="filter-label" data-i18n="table.col.status">Status</span>
+                <div class="admin-filter-group" id="adminStatusFilterGroup">
+                  <button class="filter-btn active" data-filter="all" data-i18n="filter.all">All</button>
+                  <button class="filter-btn" data-filter="AVAILABLE" data-i18n="status.available">Available</button>
+                  <button class="filter-btn" data-filter="SALE_PENDING" data-i18n="status.pending">Sale Pending</button>
+                  <button class="filter-btn" data-filter="SOLD" data-i18n="status.sold">Sold</button>
+                </div>
+              </div>
+
+              <div class="admin-filter-row admin-filter-bottom">
+                <div class="sort-wrap">
+                  <span class="filter-label" data-i18n="sort.label">Sort:</span>
+                  <select class="sort-select" id="adminSortSelect" aria-label="Sort inventory">
+                    <option value="recent" data-i18n="sort.recent">Most Recent</option>
+                    <option value="number_asc" data-i18n="sort.number_asc">Number ↑</option>
+                    <option value="number_desc" data-i18n="sort.number_desc">Number ↓</option>
+                    <option value="price_asc" data-i18n="sort.price_asc">Price ↑</option>
+                    <option value="price_desc" data-i18n="sort.price_desc">Price ↓</option>
+                  </select>
+                </div>
+                <span class="filter-count" id="adminProductCount" aria-live="polite"></span>
+              </div>
+            </div>
+
             <div class="table-wrap">
               <table class="inventory-table" aria-label="Inventory table">
                 <thead>
@@ -1032,10 +1200,10 @@
     <p style="margin-top:8px;">&copy; <span id="footerYear"></span> Anabel's Joyeria. <span data-i18n="footer.rights">All rights reserved.</span></p>
   </footer>
 
-  <script src="js/config.js"></script>
-  <script src="js/i18n.js"></script>
-  <script src="js/api.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/config.js?v=20260606-requests"></script>
+  <script src="js/i18n.js?v=20260606-requests"></script>
+  <script src="js/api.js?v=20260606-requests"></script>
+  <script src="js/app.js?v=20260606-requests"></script>
   <script>
     document.getElementById('footerYear').textContent = new Date().getFullYear();
   </script>

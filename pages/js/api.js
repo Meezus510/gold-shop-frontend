@@ -115,6 +115,14 @@ async function apiFetchItem(id, lang) {
   return _normalizePublic(data);
 }
 
+async function apiCreatePurchaseRequest(payload) {
+  return _apiFetch('/purchase-requests', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload),
+  });
+}
+
 /* ── Auth ──────────────────────────────────────────────────── */
 
 async function apiLogin(username, password) {
@@ -242,6 +250,30 @@ async function apiToggleVisibility(token, id, isVisible) {
     body:    JSON.stringify({ is_visible: isVisible }),
   });
   return _normalizeAdmin(data);
+}
+
+async function apiAdminFetchPurchaseRequests(token, status = 'pending') {
+  return _apiFetch(`/admin/purchase-requests?status=${encodeURIComponent(status)}`, {
+    headers: _authHeaders(token),
+  });
+}
+
+async function apiAdminPurchaseRequestCount(token) {
+  return _apiFetch('/admin/purchase-requests/count', { headers: _authHeaders(token) });
+}
+
+async function apiAdminAcceptPurchaseRequest(token, id) {
+  return _apiFetch(`/admin/purchase-requests/${id}/accept`, {
+    method:  'PATCH',
+    headers: _authHeaders(token),
+  });
+}
+
+async function apiAdminDeclinePurchaseRequest(token, id) {
+  return _apiFetch(`/admin/purchase-requests/${id}/decline`, {
+    method:  'PATCH',
+    headers: _authHeaders(token),
+  });
 }
 
 /* ── Image upload ──────────────────────────────────────────── */

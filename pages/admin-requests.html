@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Anabel's Joyeria purchase requests dashboard.">
+  <title>Purchase Requests — Anabel's Joyeria</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Volstead&display=swap" rel="stylesheet">
+  <style>
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal-box {
+      background: var(--white);
+      border-radius: var(--radius-md);
+      padding: 40px 36px;
+      width: 100%;
+      max-width: 380px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    }
+    .login-error { font-size: 13px; color: #C62828; min-height: 18px; margin-bottom: 12px; }
+    .requests-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+    .requests-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .requests-table th {
+      text-align: left;
+      color: var(--text-muted);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      border-bottom: 1px solid var(--border);
+      padding: 10px 8px;
+    }
+    .requests-table td {
+      border-bottom: 1px solid var(--border);
+      padding: 12px 8px;
+      vertical-align: top;
+    }
+    .request-customer { font-weight: 600; color: var(--text-primary); }
+    .request-phone { color: var(--text-muted); margin-top: 2px; }
+    .request-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+    .request-actions button {
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--white);
+      padding: 5px 10px;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+    }
+    .request-actions .accept { color: #2E7D32; border-color: #A5D6A7; }
+    .request-actions .decline { color: #C62828; border-color: #FFCDD2; }
+  </style>
+</head>
+<body>
+  <div id="loginModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <div class="modal-box">
+      <h2 id="loginTitle" data-i18n="login.title">Admin Login</h2>
+      <p data-i18n="login.subtitle">Enter your credentials to manage inventory.</p>
+      <form id="loginForm" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="loginUsername" data-i18n="login.username">Username</label>
+          <input class="form-input" type="text" id="loginUsername" name="username" autocomplete="username" required autofocus>
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPassword" data-i18n="login.password">Password</label>
+          <input class="form-input" type="password" id="loginPassword" name="password" autocomplete="current-password" required>
+        </div>
+        <p id="loginError" class="login-error" aria-live="polite"></p>
+        <button class="btn-primary" type="submit" style="width:100%;" data-i18n="login.button">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a href="index.html" class="logo" aria-label="Anabel's Joyeria Home">
+        <div class="logo-icon" aria-hidden="true">✦</div>
+        <div class="logo-text">
+          <span class="logo-name">Anabel's Joyeria</span>
+          <span class="logo-tagline" data-i18n="logo.tagline">Fine Jewelry</span>
+        </div>
+      </a>
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+        <a href="admin.html" class="btn-admin" data-i18n="nav.admin">Admin</a>
+        <button id="logoutBtn" class="btn-logout" type="button">Logout</button>
+        <a href="index.html" class="btn-admin" data-i18n="nav.viewStore">View Store</a>
+        <div class="lang-toggle" role="group" data-i18n-aria="lang.label" aria-label="Language">
+          <button class="lang-btn" data-lang="en">EN</button>
+          <button class="lang-btn" data-lang="es">ES</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main id="requestsMain" style="display:none;">
+    <section class="page-hero" aria-label="Purchase requests header">
+      <div class="container">
+        <h1 data-i18n="requests.title">Purchase Requests</h1>
+        <p data-i18n="requests.subtitle">Review customer purchase requests</p>
+      </div>
+    </section>
+
+    <div class="container" style="padding:32px 0 60px;">
+      <div class="admin-panel">
+        <div class="requests-toolbar" id="requestsFilterGroup">
+          <button class="filter-btn active" data-status="pending" data-i18n="status.pending">Sale Pending</button>
+          <button class="filter-btn" data-status="all" data-i18n="filter.all">All</button>
+          <button class="filter-btn" data-status="accepted" data-i18n="request.accepted">Request accepted.</button>
+          <button class="filter-btn" data-status="declined" data-i18n="request.declined">Request declined.</button>
+        </div>
+        <div class="table-wrap">
+          <table class="requests-table" aria-label="Purchase requests table">
+            <thead>
+              <tr>
+                <th data-i18n="requests.customer">Customer</th>
+                <th data-i18n="requests.item">Item</th>
+                <th data-i18n="requests.date">Requested</th>
+                <th data-i18n="table.col.status">Status</th>
+                <th data-i18n="requests.actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="requestsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="js/config.js?v=20260606-requests"></script>
+  <script src="js/i18n.js?v=20260606-requests"></script>
+  <script src="js/api.js?v=20260606-requests"></script>
+  <script src="js/app.js?v=20260606-requests"></script>
+</body>
+</html>

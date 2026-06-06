@@ -12,8 +12,14 @@ const CATEGORY_ICONS = {
   necklace: '📿',
   bangle:   '⭕',
   earring:  '✨',
+  earrings: '✨',
+  broqueles: '✨',
   ring:     '💍',
   bracelet: '🔗',
+  pendant:  '✦',
+  chain:    '📿',
+  brooch:   '✦',
+  set:      '💛',
   coin:     '🪙',
   default:  '💛'
 };
@@ -30,13 +36,32 @@ function formatPrice(price) {
   }).format(price);
 }
 
+function categoryKey(category) {
+  const raw = category?.toLowerCase() || 'default';
+  return raw.startsWith('cat.') ? raw.slice(4) : raw;
+}
+
+function categoryFilterKey(category) {
+  const key = categoryKey(category);
+  if (key === 'earrings' || key === 'broqueles') return 'earring';
+  return key;
+}
+
 function categoryLabel(category) {
-  const key = 'cat.' + (category?.toLowerCase() || 'default');
-  return t(key) || t('cat.default');
+  const key = 'cat.' + categoryKey(category);
+  const label = t(key);
+  return label === key ? t('cat.default') : label;
 }
 
 function categoryIcon(category) {
-  return CATEGORY_ICONS[category?.toLowerCase()] || CATEGORY_ICONS.default;
+  return CATEGORY_ICONS[categoryKey(category)] || CATEGORY_ICONS.default;
+}
+
+function metalLabel(metal) {
+  if (!metal?.name) return '';
+  const key = 'metal.' + metal.name.toLowerCase();
+  const label = t(key);
+  return label === key ? metal.name : label;
 }
 
 /**
@@ -46,8 +71,9 @@ function categoryIcon(category) {
 function formatPurity(product) {
   if (!product.metal || !product.purity_karat) return null;
   const denom = product.metal.purity_denominator;
-  if (denom === 24) return `${product.purity_karat}k ${product.metal.name}`;
-  return `${product.metal.name} ${product.purity_karat}`;
+  const metalName = metalLabel(product.metal);
+  if (denom === 24) return `${product.purity_karat}k ${metalName}`;
+  return `${metalName} ${product.purity_karat}`;
 }
 
 /** For public items the API already resolved the language into `name`. */
@@ -59,7 +85,7 @@ function productName(product) {
 /** For public items the API already resolved the language into `description`. */
 function productDesc(product) {
   if (getLang() === 'es' && product.description_es) return product.description_es;
-  return product.description;
+  return product.description || '';
 }
 
 function statusLabel(status) {
@@ -83,6 +109,7 @@ function statusClass(status) {
 /* ── Security helpers ──────────────────────────────────────── */
 
 function escapeHTML(str) {
+  if (str == null) return '';
   return String(str)
     .replace(/&/g,  '&amp;')
     .replace(/</g,  '&lt;')
@@ -92,6 +119,7 @@ function escapeHTML(str) {
 }
 
 function escapeAttr(str) {
+  if (str == null) return '';
   return String(str)
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
@@ -102,6 +130,21 @@ function setTextContent(id, value) {
   if (el) el.textContent = value;
 }
 
+function itemNumberBadgeHTML(product) {
+  return product.item_number == null
+    ? ''
+    : `<span class="item-number-badge">#${escapeHTML(product.item_number)}</span>`;
+}
+
+function displayProductName(product) {
+  const name = productName(product) || '';
+  return product.item_number == null ? name : `#${product.item_number} ${name}`;
+}
+
+function itemNameHTML(product) {
+  return `${itemNumberBadgeHTML(product)}<span>${escapeHTML(productName(product))}</span>`;
+}
+
 /* ── Card rendering ────────────────────────────────────────── */
 
 function buildCardImageHTML(product) {
@@ -109,7 +152,7 @@ function buildCardImageHTML(product) {
   if (product.image_url) {
     return `<img
       src="${escapeAttr(product.image_url)}"
-      alt="${escapeAttr(product.name)}"
+      alt="${escapeAttr(displayProductName(product))}"
       loading="lazy"
       onerror="this.style.display='none';this.nextElementSibling.style.display='flex';"
     >
@@ -129,7 +172,7 @@ function createProductCard(product) {
   card.className = `product-card${product.status === 'SOLD' ? ' is-sold' : ''}`;
   card.setAttribute('role', 'button');
   card.setAttribute('tabindex', '0');
-  card.setAttribute('aria-label', `${t('nav.catalog')}: ${productName(product)}`);
+  card.setAttribute('aria-label', `${t('nav.catalog')}: ${displayProductName(product)}`);
   card.dataset.id = product.id;
 
   card.innerHTML = `
@@ -139,8 +182,8 @@ function createProductCard(product) {
     </div>
     <div class="card-body">
       <span class="card-category">${escapeHTML(categoryLabel(product.category))}</span>
-      <h3 class="card-name">${escapeHTML(productName(product))}</h3>
-      <p class="card-desc">${escapeHTML(productDesc(product))}</p>
+      <h3 class="card-name">${itemNameHTML(product)}</h3>
+      ${productDesc(product) ? `<p class="card-desc">${escapeHTML(productDesc(product))}</p>` : ''}
       <div class="card-meta">
         <span class="card-weight">${formatPurity(product) ? escapeHTML(formatPurity(product)) : ''}</span>
         <span class="card-price">${formatPrice(product.price)}</span>
@@ -185,12 +228,13 @@ async function initCatalog() {
       const q = searchQuery.toLowerCase();
       result = result.filter(p =>
         (p.name        || '').toLowerCase().includes(q) ||
+        String(p.item_number ?? '').includes(q) ||
         (p.description || '').toLowerCase().includes(q)
       );
     }
 
     if (activeCategories.size > 0)
-      result = result.filter(p => activeCategories.has(p.category?.toLowerCase()));
+      result = result.filter(p => activeCategories.has(categoryFilterKey(p.category)));
 
     if (activeMetals.size > 0)
       result = result.filter(p => p.metal && activeMetals.has(p.metal.name.toLowerCase()));
@@ -254,7 +298,7 @@ async function initCatalog() {
 
     const seen = [...new Map(
       products.filter(p => p.metal)
-              .map(p => [p.metal.name.toLowerCase(), p.metal.name])
+              .map(p => [p.metal.name.toLowerCase(), metalLabel(p.metal)])
     ).entries()].sort((a, b) => a[1].localeCompare(b[1]));
 
     if (seen.length === 0) return;
@@ -354,9 +398,10 @@ async function initDetail() {
     return;
   }
 
-  document.title = `${productName(product)} — Gold Shop`;
+  document.title = `${displayProductName(product)} — Gold Shop`;
 
-  setTextContent('detailName',     productName(product));
+  const detailName = document.getElementById('detailName');
+  if (detailName) detailName.innerHTML = itemNameHTML(product);
   setTextContent('detailCategory', categoryLabel(product.category));
   setTextContent('detailDesc',     productDesc(product));
   // weight intentionally not shown publicly
@@ -390,7 +435,7 @@ async function initDetail() {
     const label = categoryLabel(product.category);
     if (product.image_url) {
       imgWrap.innerHTML = `
-        <img src="${escapeAttr(product.image_url)}" alt="${escapeAttr(product.name)}"
+        <img src="${escapeAttr(product.image_url)}" alt="${escapeAttr(displayProductName(product))}"
           onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
         <div class="detail-image-placeholder" style="display:none">
           <span class="placeholder-icon">${categoryIcon(product.category)}</span>
@@ -409,7 +454,7 @@ async function initDetail() {
   if (contactBtn) {
     contactBtn.addEventListener('click', () => {
       const msgText = t('whatsapp.msg', {
-        name:   productName(product),
+        name:   displayProductName(product),
         weight: product.weight_grams,
         price:  formatPrice(product.price)
       });
@@ -417,6 +462,69 @@ async function initDetail() {
       window.open(`https://wa.me/${number}?text=${encodeURIComponent(msgText)}`, '_blank');
     });
   }
+
+  initPurchaseRequestModal(product);
+}
+
+function initPurchaseRequestModal(product) {
+  const modal = document.getElementById('purchaseRequestModal');
+  const openBtn = document.getElementById('requestPurchaseBtn');
+  const closeBtn = document.getElementById('requestModalClose');
+  const form = document.getElementById('purchaseRequestForm');
+  const statusEl = document.getElementById('requestStatus');
+  const submitBtn = document.getElementById('requestSubmitBtn');
+  const itemEl = document.getElementById('requestModalItem');
+
+  if (!modal || !openBtn || !form) return;
+  if (itemEl) itemEl.textContent = displayProductName(product);
+
+  function close() {
+    modal.classList.remove('visible');
+    if (statusEl) statusEl.textContent = '';
+  }
+
+  openBtn.addEventListener('click', () => {
+    modal.classList.add('visible');
+    document.getElementById('requestName')?.focus();
+  });
+  closeBtn?.addEventListener('click', close);
+  modal.addEventListener('click', e => {
+    if (e.target === modal) close();
+  });
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const name = document.getElementById('requestName')?.value.trim();
+    const phone = document.getElementById('requestPhone')?.value.trim();
+    if (!name || !phone) {
+      if (statusEl) {
+        statusEl.textContent = t('request.required');
+        statusEl.style.color = '#C62828';
+      }
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+    if (statusEl) {
+      statusEl.textContent = t('request.sending');
+      statusEl.style.color = 'var(--text-muted)';
+    }
+    try {
+      await apiCreatePurchaseRequest({ item_id: product.id, name, phone });
+      form.reset();
+      if (statusEl) {
+        statusEl.textContent = t('request.success');
+        statusEl.style.color = '#2E7D32';
+      }
+    } catch (err) {
+      if (statusEl) {
+        statusEl.textContent = err.message || t('request.error');
+        statusEl.style.color = '#C62828';
+      }
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  });
 }
 
 function redirectHome() {
@@ -425,7 +533,7 @@ function redirectHome() {
 
 /* ── Admin — login modal ───────────────────────────────────── */
 
-function showLoginModal() {
+function showLoginModal(afterLogin = loadAdminPage) {
   const modal = document.getElementById('loginModal');
   if (!modal) return;
   modal.classList.add('visible');
@@ -448,7 +556,7 @@ function showLoginModal() {
       const token = await apiLogin(username, password);
       sessionStorage.setItem('goldshop_token', token);
       modal.classList.remove('visible');
-      await loadAdminPage(token);
+      await afterLogin(token);
     } catch (_) {
       loginError.textContent = t('login.invalid');
     } finally {
@@ -460,7 +568,12 @@ function showLoginModal() {
 
 function handleAuthError() {
   sessionStorage.removeItem('goldshop_token');
-  showLoginModal();
+  const page = window.location.pathname.split('/').pop();
+  if (page === 'admin-requests.html' || page === 'admin-requests') {
+    showLoginModal(loadAdminRequestsPage);
+  } else {
+    showLoginModal();
+  }
   showToast(t('login.expired'), 'error');
 }
 
@@ -488,6 +601,7 @@ async function loadAdminPage(token) {
   const formSubtitle = document.getElementById('formSubtitle');
   const submitBtn    = document.getElementById('submitBtn');
   const logoutBtn    = document.getElementById('logoutBtn');
+  await updateRequestBadge(token);
 
   // Reveal page content now that the user is authenticated
   const adminContent = document.getElementById('adminContent');
@@ -499,6 +613,13 @@ async function loadAdminPage(token) {
 
   let editingId     = null;
   let selectedMetal = null;   // { id, name, symbol, purity_denominator, … } or null for N/A
+  let adminProducts = [];
+  let adminSearchQuery = '';
+  let adminSortBy = 'recent';
+  const adminActiveCategories = new Set();
+  const adminActiveMetals = new Set();
+  const adminActivePurities = new Set();
+  const adminActiveStatuses = new Set();
 
   /* -- Metal picker + spot prices -- */
   let metals = [];
@@ -536,7 +657,7 @@ async function loadAdminPage(token) {
     syncRatesEl.innerHTML = items.map(m => {
       const perGram = spotPriceMap[m.id] / GRAMS_PER_OZ;
       return `<div class="sync-rate-item">
-        <span class="sync-rate-name">${escapeHTML(m.name)}</span>
+        <span class="sync-rate-name">${escapeHTML(metalLabel(m))}</span>
         <span class="sync-rate-value">${formatPrice(perGram)}<span style="font-size:11px;font-weight:400;color:var(--text-muted)">/g</span></span>
       </div>`;
     }).join('');
@@ -613,9 +734,21 @@ async function loadAdminPage(token) {
 
   const metalPicker = document.getElementById('metalPicker');
   const metalIdInput = document.getElementById('metalId');
+  const pricingModeGroup = document.getElementById('pricingModeGroup');
+  const pricingModeSelect = document.getElementById('pricingMode');
+  const pricingModeHint = document.getElementById('pricingModeHint');
   const karatGroup  = document.getElementById('karatGroup');
   const karatHint   = document.getElementById('karatHint');
   const purityKarat = document.getElementById('purityKarat');
+
+  function currentPricingMode() {
+    if (!selectedMetal) return 'MANUAL';
+    return pricingModeSelect?.value || 'METAL_DYNAMIC';
+  }
+
+  function isManualPricing() {
+    return currentPricingMode() === 'MANUAL';
+  }
 
   function selectMetal(metal) {
     selectedMetal = metal;
@@ -628,8 +761,9 @@ async function loadAdminPage(token) {
       });
     }
 
-    // Show/hide karat field and manual price field
+    // Show/hide karat/pricing fields and manual price field
     if (karatGroup) karatGroup.style.display = metal ? '' : 'none';
+    if (pricingModeGroup) pricingModeGroup.style.display = metal ? '' : 'none';
     const manualPriceGroup = document.getElementById('manualPriceGroup');
     if (manualPriceGroup) manualPriceGroup.style.display = metal ? 'none' : '';
 
@@ -645,6 +779,27 @@ async function loadAdminPage(token) {
       }
     }
 
+    updatePricingModeUI();
+    updatePricePreview();
+  }
+
+  function updatePricingModeUI() {
+    const manual = isManualPricing();
+    const flatHint = document.querySelector('[data-i18n="form.hint.flat_markup"]');
+    const weightLabel = document.getElementById('weightRequired');
+
+    if (pricingModeHint) {
+      pricingModeHint.textContent = manual ? t('pricing.hint.manual') : t('pricing.hint.dynamic');
+    }
+    if (flatHint) {
+      flatHint.textContent = manual ? t('form.hint.flat_manual') : t('form.hint.flat_markup');
+    }
+    if (weightLabel) {
+      weightLabel.style.display = selectedMetal && !manual ? '' : 'none';
+    }
+    if (manual && pricePreview) {
+      pricePreview.style.display = 'none';
+    }
     updatePricePreview();
   }
 
@@ -660,7 +815,7 @@ async function loadAdminPage(token) {
   const GRAMS_PER_OZ = 31.1035;
 
   function calculateMetalValue() {
-    if (!selectedMetal) return null;
+    if (!selectedMetal || isManualPricing()) return null;
 
     const spotPrice   = spotPriceMap[selectedMetal.id];
     const weightGrams = getNumericFieldValue(document.getElementById('weight'));
@@ -676,7 +831,10 @@ async function loadAdminPage(token) {
   }
 
   function updatePricePreview() {
-    if (!selectedMetal || !pricePreview) return;
+    if (!selectedMetal || !pricePreview || isManualPricing()) {
+      if (pricePreview) pricePreview.style.display = 'none';
+      return;
+    }
 
     pricePreview.style.display = '';
 
@@ -721,6 +879,17 @@ async function loadAdminPage(token) {
     if (pricePreview)   pricePreview.classList.toggle('below-min', belowMin);
   }
 
+  pricingModeSelect?.addEventListener('change', () => {
+    updatePricingModeUI();
+  });
+
+  document.getElementById('category')?.addEventListener('change', e => {
+    if (categoryKey(e.target.value) === 'broqueles' && pricingModeSelect) {
+      pricingModeSelect.value = 'MANUAL';
+      updatePricingModeUI();
+    }
+  });
+
   if (metalPicker) {
     // N/A pill
     const naBtn = document.createElement('button');
@@ -737,7 +906,7 @@ async function loadAdminPage(token) {
       btn.type = 'button';
       btn.className = 'metal-btn';
       btn.dataset.metalId = String(metal.id);
-      btn.textContent = metal.name;
+      btn.textContent = metalLabel(metal);
       btn.addEventListener('click', () => selectMetal(metal));
       metalPicker.appendChild(btn);
     });
@@ -771,13 +940,186 @@ async function loadAdminPage(token) {
   /* -- Load and render table -- */
   async function reloadTable() {
     try {
-      const products = await apiAdminFetchItems(token);
-      renderTable(products);
-      updateStats(products);
+      adminProducts = await apiAdminFetchItems(token);
+      buildAdminDynamicFilters(adminProducts);
+      applyAdminFilters();
+      updateStats(adminProducts);
     } catch (err) {
       if (err.status === 401) { handleAuthError(); return; }
       showToast(t('error.load_items'), 'error');
     }
+  }
+
+  function adminSearchText(product) {
+    return [
+      product.item_number,
+      product.name,
+      product.name_es,
+      product.description,
+      product.description_es,
+      categoryLabel(product.category),
+      product.category,
+      product.metal?.name,
+      metalLabel(product.metal),
+      product.purity_karat,
+      product.purchase_location?.name,
+      product.status,
+      statusLabel(product.status),
+    ].filter(v => v != null && v !== '').join(' ').toLowerCase();
+  }
+
+  function applyAdminFilters() {
+    let result = adminProducts;
+
+    if (adminSearchQuery) {
+      const q = adminSearchQuery.toLowerCase();
+      result = result.filter(p => adminSearchText(p).includes(q));
+    }
+
+    if (adminActiveCategories.size > 0) {
+      result = result.filter(p => adminActiveCategories.has(categoryFilterKey(p.category)));
+    }
+
+    if (adminActiveMetals.size > 0) {
+      result = result.filter(p => p.metal && adminActiveMetals.has(p.metal.name.toLowerCase()));
+    }
+
+    if (adminActivePurities.size > 0) {
+      result = result.filter(p => adminActivePurities.has(String(p.purity_karat)));
+    }
+
+    if (adminActiveStatuses.size > 0) {
+      result = result.filter(p => adminActiveStatuses.has(p.status));
+    }
+
+    result = [...result];
+    if (adminSortBy === 'number_asc') {
+      result.sort((a, b) => (a.item_number ?? Infinity) - (b.item_number ?? Infinity));
+    } else if (adminSortBy === 'number_desc') {
+      result.sort((a, b) => (b.item_number ?? -Infinity) - (a.item_number ?? -Infinity));
+    } else if (adminSortBy === 'price_asc') {
+      result.sort((a, b) => (a.listed_price_flat ?? Infinity) - (b.listed_price_flat ?? Infinity));
+    } else if (adminSortBy === 'price_desc') {
+      result.sort((a, b) => (b.listed_price_flat ?? -Infinity) - (a.listed_price_flat ?? -Infinity));
+    }
+
+    renderTable(result);
+    const countEl = document.getElementById('adminProductCount');
+    if (countEl) {
+      const n = result.length;
+      countEl.textContent = n === 1 ? t('count.one') : t('count.many', { n });
+    }
+  }
+
+  function buildAdminDynamicFilters(products) {
+    const metalRow = document.getElementById('adminMetalFilterRow');
+    const metalGroup = document.getElementById('adminMetalFilterGroup');
+    const purityRow = document.getElementById('adminPurityFilterRow');
+    const purityGroup = document.getElementById('adminPurityFilterGroup');
+
+    if (metalGroup && metalRow) {
+      metalGroup.innerHTML = '';
+      const metalsSeen = [...new Map(
+        products.filter(p => p.metal)
+          .map(p => [p.metal.name.toLowerCase(), metalLabel(p.metal)])
+      ).entries()].sort((a, b) => a[1].localeCompare(b[1]));
+
+      metalsSeen.forEach(([key, label]) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `filter-btn${adminActiveMetals.has(key) ? ' active' : ''}`;
+        btn.textContent = label;
+        btn.addEventListener('click', () => {
+          toggleAdminFilter(adminActiveMetals, key, btn);
+          applyAdminFilters();
+        });
+        metalGroup.appendChild(btn);
+      });
+      metalRow.style.display = metalsSeen.length ? '' : 'none';
+    }
+
+    if (purityGroup && purityRow) {
+      purityGroup.innerHTML = '';
+      const puritiesSeen = [...new Set(
+        products.filter(p => p.purity_karat != null).map(p => String(p.purity_karat))
+      )].sort((a, b) => Number(b) - Number(a));
+
+      puritiesSeen.forEach(purity => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `filter-btn${adminActivePurities.has(purity) ? ' active' : ''}`;
+        btn.textContent = `${purity}k`;
+        btn.addEventListener('click', () => {
+          toggleAdminFilter(adminActivePurities, purity, btn);
+          applyAdminFilters();
+        });
+        purityGroup.appendChild(btn);
+      });
+      purityRow.style.display = puritiesSeen.length ? '' : 'none';
+    }
+  }
+
+  function toggleAdminFilter(set, value, btn) {
+    if (set.has(value)) {
+      set.delete(value);
+      btn.classList.remove('active');
+    } else {
+      set.add(value);
+      btn.classList.add('active');
+    }
+  }
+
+  function initAdminFilters() {
+    const searchInput = document.getElementById('adminSearch');
+    const sortSelect = document.getElementById('adminSortSelect');
+    const categoryGroup = document.getElementById('adminCategoryFilterGroup');
+    const statusGroup = document.getElementById('adminStatusFilterGroup');
+
+    let searchTimer;
+    searchInput?.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(() => {
+        adminSearchQuery = searchInput.value.trim();
+        applyAdminFilters();
+      }, 250);
+    });
+
+    sortSelect?.addEventListener('change', () => {
+      adminSortBy = sortSelect.value;
+      applyAdminFilters();
+    });
+
+    categoryGroup?.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.filter;
+        const allBtn = categoryGroup.querySelector('[data-filter="all"]');
+        if (val === 'all') {
+          adminActiveCategories.clear();
+          categoryGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        } else {
+          toggleAdminFilter(adminActiveCategories, val, btn);
+          allBtn?.classList.toggle('active', adminActiveCategories.size === 0);
+        }
+        applyAdminFilters();
+      });
+    });
+
+    statusGroup?.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const val = btn.dataset.filter;
+        const allBtn = statusGroup.querySelector('[data-filter="all"]');
+        if (val === 'all') {
+          adminActiveStatuses.clear();
+          statusGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+        } else {
+          toggleAdminFilter(adminActiveStatuses, val, btn);
+          allBtn?.classList.toggle('active', adminActiveStatuses.size === 0);
+        }
+        applyAdminFilters();
+      });
+    });
   }
 
   function updateStats(products) {
@@ -799,7 +1141,7 @@ async function loadAdminPage(token) {
     products.forEach(p => {
       const tr = document.createElement('tr');
       const imgHTML = p.image_url
-        ? `<img class="table-img" src="${escapeAttr(p.image_url)}" alt="${escapeAttr(p.name)}" onerror="this.parentElement.innerHTML='<div class=\\'table-img-placeholder\\'>${categoryIcon(p.category)}</div>'">`
+        ? `<img class="table-img" src="${escapeAttr(p.image_url)}" alt="${escapeAttr(displayProductName(p))}" onerror="this.parentElement.innerHTML='<div class=\\'table-img-placeholder\\'>${categoryIcon(p.category)}</div>'">`
         : `<div class="table-img-placeholder">${categoryIcon(p.category)}</div>`;
 
       const isMulti    = p.quantity > 1;
@@ -810,7 +1152,7 @@ async function loadAdminPage(token) {
           ? (p.metal.purity_denominator === 24 ? `${p.purity_karat}k` : `${p.purity_karat}`)
           : '';
         const mult = (p.price_multiplier && p.price_multiplier !== 1) ? `×${p.price_multiplier}` : '';
-        return [p.metal.name, purity, mult].filter(Boolean).join(' · ');
+        return [metalLabel(p.metal), purity, mult].filter(Boolean).join(' · ');
       })();
       const locationDetail = p.purchase_location?.name || '';
 
@@ -834,7 +1176,7 @@ async function loadAdminPage(token) {
       tr.innerHTML = `
         <td>${imgHTML}</td>
         <td>
-          <div class="table-name">${escapeHTML(productName(p))}</div>
+          <div class="table-name">${itemNameHTML(p)}</div>
           <div class="table-sub">${escapeHTML(categoryLabel(p.category))}${metalDetail ? ' · ' + escapeHTML(metalDetail) : ''}</div>
           ${locationDetail ? `<div class="table-loc">${escapeHTML(locationDetail)}</div>` : ''}
         </td>
@@ -1005,6 +1347,7 @@ async function loadAdminPage(token) {
         const status = document.getElementById('status')?.value;
         return status === 'SOLD' || status === 'SALE_PENDING';
       } },
+      { id: 'itemNumber', labelKey: 'validation.field.item_number' },
     ];
 
     let firstError = null;
@@ -1122,6 +1465,8 @@ async function loadAdminPage(token) {
     imageFileInput.addEventListener('change', () => handleFiles(imageFileInput.files));
   }
 
+  initAdminFilters();
+
   /* -- Show/hide sell price based on status -- */
   const sellPriceGroup = document.getElementById('sellPriceGroup');
   const statusSelect = document.getElementById('status');
@@ -1152,24 +1497,34 @@ async function loadAdminPage(token) {
     const enteredSellPriceVal = getNumericFieldValue(fld('markupFlat'));
     const enteredLoanPriceVal = getNumericFieldValue(fld('markupLoan'));
     const purityKaratVal = getNumericFieldValue(purityKarat);
+    const itemNumberVal  = parseInt(fld('itemNumber')?.value, 10);
     const quantityVal    = parseInt(fld('quantity')?.value, 10);
     const locVal         = locationSelect?.value;
     const marketValue    = calculateMetalValue();
-    const markupFlatVal  = selectedMetal && marketValue !== null && enteredSellPriceVal !== null
+    const pricingModeVal = currentPricingMode();
+    const manualMetal = selectedMetal && pricingModeVal === 'MANUAL';
+    const markupFlatVal  = selectedMetal && !manualMetal && marketValue !== null && enteredSellPriceVal !== null
       ? Math.max(enteredSellPriceVal - marketValue, 0)
       : null;
-    const markupLoanVal  = selectedMetal && enteredSellPriceVal !== null
+    const markupLoanVal  = selectedMetal && !manualMetal && enteredSellPriceVal !== null
       ? Math.max((enteredLoanPriceVal ?? enteredSellPriceVal) - enteredSellPriceVal, 0)
       : null;
 
     return {
+      item_number:          isNaN(itemNumberVal)  ? null : itemNumberVal,
       category:             fld('category')?.value || '',
       metal_id:             selectedMetal ? selectedMetal.id : null,
+      pricing_mode:         pricingModeVal,
       purity_karat:         selectedMetal && purityKaratVal !== null ? purityKaratVal : null,
       weight_grams:         weightVal === null      ? null : weightVal,
       markup_flat:          selectedMetal ? markupFlatVal : null,
       markup_loan:          selectedMetal ? markupLoanVal : null,
-      listed_price_flat:    !selectedMetal && manualPriceVal !== null ? manualPriceVal : null,
+      listed_price_flat:    manualMetal && enteredSellPriceVal !== null ? enteredSellPriceVal
+                            : !selectedMetal && manualPriceVal !== null ? manualPriceVal
+                            : null,
+      listed_price_loan:    manualMetal && enteredSellPriceVal !== null
+                            ? (enteredLoanPriceVal ?? enteredSellPriceVal)
+                            : null,
       quantity:             isNaN(quantityVal)    ? 1    : quantityVal,
       purchase_location_id: (locVal && locVal !== '__new__') ? parseInt(locVal, 10) : null,
       cost:                 isNaN(costVal)        ? null : costVal,
@@ -1186,8 +1541,9 @@ async function loadAdminPage(token) {
     e.preventDefault();
 
     const missingName   = !document.getElementById('productName')?.value.trim();
+    const manualPricing = isManualPricing();
     const missingKarat  = selectedMetal && !purityKarat?.value;
-    const missingWeight = selectedMetal && !document.getElementById('weight')?.value;
+    const missingWeight = selectedMetal && !manualPricing && !document.getElementById('weight')?.value;
     const enteredSellPrice = getNumericFieldValue(document.getElementById('markupFlat'));
     const enteredLoanPrice = getNumericFieldValue(document.getElementById('markupLoan'));
     const missingSellPrice = selectedMetal && enteredSellPrice === null;
@@ -1207,7 +1563,7 @@ async function loadAdminPage(token) {
       return;
     }
 
-    if (selectedMetal) {
+    if (selectedMetal && !manualPricing) {
       const marketValue = calculateMetalValue();
       if (marketValue === null) {
         showToast(t('preview.spot_unavailable'), 'error');
@@ -1226,10 +1582,11 @@ async function loadAdminPage(token) {
         return;
       }
 
-      if (enteredLoanPrice !== null && enteredLoanPrice < enteredSellPrice) {
-        showToast(t('validation.loan_below_sell'), 'error');
-        return;
-      }
+    }
+
+    if (selectedMetal && enteredLoanPrice !== null && enteredLoanPrice < enteredSellPrice) {
+      showToast(t('validation.loan_below_sell'), 'error');
+      return;
     }
 
     submitBtn.disabled = true;
@@ -1263,6 +1620,7 @@ async function loadAdminPage(token) {
 
     document.getElementById('productName').value    = product.name           || '';
     document.getElementById('productNameEs').value  = product.name_es        || '';
+    document.getElementById('itemNumber').value     = product.item_number    ?? '';
     document.getElementById('description').value    = product.description    || '';
     document.getElementById('descriptionEs').value  = product.description_es || '';
     document.getElementById('category').value       = product.category;
@@ -1292,8 +1650,13 @@ async function loadAdminPage(token) {
 
     // Restore metal picker selection
     const metalForItem = product.metal ? metals.find(m => m.id === product.metal.id) : null;
+    if (pricingModeSelect) {
+      pricingModeSelect.value = product.pricing_mode
+        || (categoryKey(product.category) === 'broqueles' ? 'MANUAL' : metalForItem ? 'METAL_DYNAMIC' : 'MANUAL');
+    }
     selectMetal(metalForItem || null);
     if (purityKarat) purityKarat.value = product.purity_karat ?? '';
+    updatePricingModeUI();
 
     // Restore image gallery from existing item images
     imageUrls = product.image_urls ? [...product.image_urls] : [];
@@ -1332,6 +1695,7 @@ async function loadAdminPage(token) {
     if (statusEl) statusEl.disabled = false;
     form.reset();
     form.querySelectorAll('.input-error').forEach(el => el.classList.remove('input-error'));
+    if (pricingModeSelect) pricingModeSelect.value = 'METAL_DYNAMIC';
     selectMetal(null);
     if (purityKarat) purityKarat.value = '';
     if (pricePreview) pricePreview.style.display = 'none';
@@ -1411,6 +1775,127 @@ async function loadAdminPage(token) {
   await reloadTable();
 }
 
+async function updateRequestBadge(token) {
+  const badge = document.getElementById('requestBadge');
+  if (!badge) return;
+  try {
+    const count = await apiAdminPurchaseRequestCount(token);
+    const pending = count.pending || 0;
+    badge.textContent = pending;
+    badge.style.display = pending > 0 ? 'inline-flex' : 'none';
+  } catch (_) {
+    badge.style.display = 'none';
+  }
+}
+
+async function initAdminRequests() {
+  const main = document.getElementById('requestsMain');
+  const tableBody = document.getElementById('requestsTableBody');
+  const filterGroup = document.getElementById('requestsFilterGroup');
+  const logoutBtn = document.getElementById('logoutBtn');
+  if (!main || !tableBody) return;
+
+  const token = sessionStorage.getItem('goldshop_token');
+  if (!token) {
+    showLoginModal(async () => initAdminRequests());
+    return;
+  }
+
+  logoutBtn?.addEventListener('click', () => {
+    sessionStorage.removeItem('goldshop_token');
+    window.location.reload();
+  });
+
+  filterGroup?.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      filterGroup.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      await loadRequests(token, btn.dataset.status || 'pending');
+    });
+  });
+
+  await loadAdminRequestsPage(token);
+}
+
+async function loadAdminRequestsPage(token) {
+  const main = document.getElementById('requestsMain');
+  if (main) main.style.display = '';
+  await loadRequests(token, 'pending');
+}
+
+function requestStatusLabel(status) {
+  if (status === 'PENDING') return t('status.pending');
+  if (status === 'ACCEPTED') return t('request.accepted');
+  if (status === 'DECLINED') return t('request.declined');
+  return status;
+}
+
+async function loadRequests(token, statusFilter) {
+  const tableBody = document.getElementById('requestsTableBody');
+  if (!tableBody) return;
+  tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:28px;color:#9A9A9A;">Loading...</td></tr>`;
+
+  let requests;
+  try {
+    requests = await apiAdminFetchPurchaseRequests(token, statusFilter);
+  } catch (err) {
+    if (err.status === 401) { handleAuthError(); return; }
+    showToast(err.message || t('error.load_items'), 'error');
+    return;
+  }
+
+  if (requests.length === 0) {
+    tableBody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:28px;color:#9A9A9A;">${t('requests.empty')}</td></tr>`;
+    return;
+  }
+
+  tableBody.innerHTML = '';
+  requests.forEach(req => {
+    const tr = document.createElement('tr');
+    const itemLabel = `${req.item_number_snapshot ? `#${req.item_number_snapshot} ` : ''}${req.item_name_snapshot}`;
+    tr.innerHTML = `
+      <td>
+        <div class="request-customer">${escapeHTML(req.customer_name)}</div>
+        <div class="request-phone">${escapeHTML(req.customer_phone)}</div>
+      </td>
+      <td>
+        <div class="table-name">${escapeHTML(itemLabel)}</div>
+        <div class="table-sub">${formatPrice(req.listed_price_snapshot)}</div>
+      </td>
+      <td>${escapeHTML(new Date(req.created_at).toLocaleString())}</td>
+      <td>${escapeHTML(requestStatusLabel(req.status))}</td>
+      <td>
+        ${req.status === 'PENDING' ? `
+          <div class="request-actions">
+            <button class="accept" data-action="accept" data-id="${req.id}">${t('request.accept')}</button>
+            <button class="decline" data-action="decline" data-id="${req.id}">${t('request.decline')}</button>
+          </div>
+        ` : '—'}
+      </td>
+    `;
+    tr.querySelectorAll('button[data-action]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          if (btn.dataset.action === 'accept') {
+            await apiAdminAcceptPurchaseRequest(token, req.id);
+            showToast(t('request.accepted'), 'success');
+          } else {
+            await apiAdminDeclinePurchaseRequest(token, req.id);
+            showToast(t('request.declined'), 'info');
+          }
+          await loadRequests(token, statusFilter);
+        } catch (err) {
+          if (err.status === 401) { handleAuthError(); return; }
+          showToast(err.message || t('error.save_item'), 'error');
+          btn.disabled = false;
+        }
+      });
+    });
+    tableBody.appendChild(tr);
+  });
+}
+
 /* ── Toast ─────────────────────────────────────────────────── */
 
 function showToast(message, type = 'info') {
@@ -1439,6 +1924,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     await initDetail();
   } else if (page === 'admin.html' || page === 'admin') {
     await initAdmin();
+  } else if (page === 'admin-requests.html' || page === 'admin-requests') {
+    await initAdminRequests();
   }
 
   if (typeof applyTranslations === 'function') applyTranslations();
