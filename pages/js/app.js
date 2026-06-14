@@ -131,14 +131,25 @@ function setTextContent(id, value) {
 }
 
 function itemNumberBadgeHTML(product) {
-  return product.item_number == null
+  const code = itemCode(product);
+  return !code
     ? ''
-    : `<span class="item-number-badge">#${escapeHTML(product.item_number)}</span>`;
+    : `<span class="item-number-badge">${escapeHTML(code)}</span>`;
+}
+
+function itemCode(product) {
+  if (!product) return '';
+  if (product.item_code) return String(product.item_code);
+  if (product.item_number_prefix && product.item_number != null) {
+    return `${product.item_number_prefix}-${product.item_number}`;
+  }
+  return product.item_number == null ? '' : String(product.item_number);
 }
 
 function displayProductName(product) {
   const name = productName(product) || '';
-  return product.item_number == null ? name : `#${product.item_number} ${name}`;
+  const code = itemCode(product);
+  return code ? `${code} ${name}` : name;
 }
 
 function itemNameHTML(product) {
@@ -228,7 +239,7 @@ async function initCatalog() {
       const q = searchQuery.toLowerCase();
       result = result.filter(p =>
         (p.name        || '').toLowerCase().includes(q) ||
-        String(p.item_number ?? '').includes(q) ||
+        itemCode(p).toLowerCase().includes(q) ||
         (p.description || '').toLowerCase().includes(q)
       );
     }
@@ -952,7 +963,9 @@ async function loadAdminPage(token) {
 
   function adminSearchText(product) {
     return [
+      itemCode(product),
       product.item_number,
+      product.item_number_prefix,
       product.name,
       product.name_es,
       product.description,
@@ -966,6 +979,16 @@ async function loadAdminPage(token) {
       product.status,
       statusLabel(product.status),
     ].filter(v => v != null && v !== '').join(' ').toLowerCase();
+  }
+
+  function compareItemNumberCodes(a, b, direction = 1) {
+    const prefixA = String(a.item_number_prefix || '').toUpperCase();
+    const prefixB = String(b.item_number_prefix || '').toUpperCase();
+    const prefixCompare = prefixA.localeCompare(prefixB);
+    if (prefixCompare !== 0) return prefixCompare * direction;
+    const numberA = a.item_number ?? Infinity;
+    const numberB = b.item_number ?? Infinity;
+    return (numberA - numberB) * direction;
   }
 
   function applyAdminFilters() {
@@ -994,9 +1017,9 @@ async function loadAdminPage(token) {
 
     result = [...result];
     if (adminSortBy === 'number_asc') {
-      result.sort((a, b) => (a.item_number ?? Infinity) - (b.item_number ?? Infinity));
+      result.sort((a, b) => compareItemNumberCodes(a, b, 1));
     } else if (adminSortBy === 'number_desc') {
-      result.sort((a, b) => (b.item_number ?? -Infinity) - (a.item_number ?? -Infinity));
+      result.sort((a, b) => compareItemNumberCodes(a, b, -1));
     } else if (adminSortBy === 'price_asc') {
       result.sort((a, b) => (a.listed_price_flat ?? Infinity) - (b.listed_price_flat ?? Infinity));
     } else if (adminSortBy === 'price_desc') {
@@ -1852,7 +1875,11 @@ async function loadRequests(token, statusFilter) {
   tableBody.innerHTML = '';
   requests.forEach(req => {
     const tr = document.createElement('tr');
-    const itemLabel = `${req.item_number_snapshot ? `#${req.item_number_snapshot} ` : ''}${req.item_name_snapshot}`;
+    const requestItemCode = req.item_code_snapshot
+      || (req.item_number_prefix_snapshot && req.item_number_snapshot != null
+        ? `${req.item_number_prefix_snapshot}-${req.item_number_snapshot}`
+        : '');
+    const itemLabel = `${requestItemCode ? `${requestItemCode} ` : ''}${req.item_name_snapshot}`;
     tr.innerHTML = `
       <td>
         <div class="request-customer">${escapeHTML(req.customer_name)}</div>
